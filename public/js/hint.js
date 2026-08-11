@@ -19,7 +19,7 @@
   const slot = document.getElementById('hintSlot');
   if (!slot) return;  // 无插槽则静默退出
 
-  const DEPTHS = { easy: 2, medium: 3, hard: 4 };
+  const DEPTHS = { easy: 3, medium: 4, hard: 5 };
   let level = localStorage.getItem('xq-hint-level') || 'medium';
   if (!DEPTHS[level]) level = 'medium';
 

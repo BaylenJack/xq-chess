@@ -11,8 +11,8 @@
 
   const MATE = 8888;          // 将死分值
   const MAX_NODES = 3000000;  // 安全上限, 防极端局面卡死
-  // 深度 → 节点预算 (满血: 深 4 完整搜索, 仅防极端局面失控)
-  const DEPTH_BUDGET = { 2: 100000, 3: 1000000, 4: 10000000 };
+  // 深度 → 节点预算 (满血: 深 5 完整搜索, 预算不足自动退深 4 兜底)
+  const DEPTH_BUDGET = { 2: 100000, 3: 1000000, 4: 10000000, 5: 10000000 };
 
   // ---- 位置估值表 (红方视角, row 0=红底线 → row 9=黑底线) ----
   const PST = {
@@ -119,6 +119,12 @@
       }
     }
     return total < 1500;   // 约剩 2车1炮 以下
+  }
+  // 盘面子力密度 (用于深度自适应: 开局子多 → 分支因子大, 自动降层)
+  function pieceCount(map) {
+    let n = 0;
+    for (let r = 0; r < 10; r++) for (let c = 0; c < 9; c++) if (map[r][c]) n++;
+    return n;
   }
 
   // 红方位置表取值; 黑方行镜像 (9 - r)
@@ -459,6 +465,30 @@
   function getBestMove(map, my, depth, randomize) {
     const moves = R.legalMoves(map, my);
     if (moves.length === 0) return null;
+
+    // 迭代加深: 深 5 时先跑深 4 (快), 再尝试深 5; 深 5 超预算 → 用深 4 结果兜底
+    // 深度自适应: 开局子多 (分支因子大) 自动降深 4, 中残局子少才深 5 (提示响应快)
+    if (depth >= 5) {
+      if (pieceCount(map) > 22) return getBestMove(map, my, 4, randomize);
+      const d4 = getBestMove(map, my, 4, randomize);
+      // 预算: 深 5 给 2 倍深 4 预算, 超出即用 d4
+      const d5Budget = (DEPTH_BUDGET[4] || MAX_NODES) * 2;
+      nodeCount = 0;
+      searchDepth = 5;
+      clearHistory();
+      TT.clear();
+      sortMoves(moves, map);
+      curHash = boardHash(map);
+      nodeBudget = d5Budget;
+      try {
+        const mv = mtdf(map, my, 5, d4 ? d4.score : 0);
+        if (mv) { mv.score = mv.score !== undefined ? mv.score : (d4 ? d4.score : 0); return mv; }
+      } catch (e) {
+        if (e.message !== 'nodes-exceeded' && e.message !== 'budget-exceeded') throw e;
+      }
+      // 深 5 失败 → 返回深 4 结果
+      return d4;
+    }
 
     nodeCount = 0;
     searchDepth = depth;
