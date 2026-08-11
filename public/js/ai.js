@@ -11,6 +11,8 @@
 
   const MATE = 8888;          // 将死分值
   const MAX_NODES = 3000000;  // 安全上限, 防极端局面卡死
+  // 深度 → 节点预算 (迭代加深: 超预算退浅一层, 保证响应速度)
+  const DEPTH_BUDGET = { 2: 20000, 3: 80000, 4: 60000 };
 
   // ---- 位置估值表 (红方视角, row 0=红底线 → row 9=黑底线) ----
   const PST = {
@@ -142,10 +144,12 @@
   }
 
   let nodeCount = 0;
+  let nodeBudget = Infinity;   // 当前搜索的节点预算 (超限抛 budget-exceeded, 用已搜结果兜底)
 
   // negamax alpha-beta: 返回分值; 根节点选最佳着法
   function negamax(map, my, depth, alpha, beta) {
     nodeCount++;
+    if (nodeCount > nodeBudget) throw new Error('budget-exceeded');
     if (nodeCount > MAX_NODES) throw new Error('nodes-exceeded');
 
     if (depth === 0) {
@@ -198,6 +202,9 @@
     let bestMove = null;
     let bestScore = -Infinity;
 
+    // 节点预算: 超限抛 budget-exceeded, 用已搜结果兜底 (保证响应速度)
+    nodeBudget = DEPTH_BUDGET[depth] || MAX_NODES;
+
     try {
       for (const mv of moves) {
         const captured = R.makeMove(map, mv);
@@ -218,8 +225,8 @@
         if (score > alpha) alpha = score;
       }
     } catch (e) {
-      if (e.message !== 'nodes-exceeded') throw e;
-      // 节点超限: 用当前搜索到的着法兜底 (即使未完成)
+      if (e.message !== 'nodes-exceeded' && e.message !== 'budget-exceeded') throw e;
+      // 节点超限/预算超: 用当前搜索到的着法兜底 (即使未完成)
     }
 
     if (!bestMove) return null;

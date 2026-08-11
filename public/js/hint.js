@@ -13,6 +13,8 @@
   let enabled = false;
   let timer = null;
   let computing = false;
+  let worker = null;
+  let workerSeq = 0;
 
   const slot = document.getElementById('hintSlot');
   if (!slot) return;  // 无插槽则静默退出
@@ -20,6 +22,41 @@
   const DEPTHS = { easy: 2, medium: 3, hard: 4 };
   let level = localStorage.getItem('xq-hint-level') || 'medium';
   if (!DEPTHS[level]) level = 'medium';
+
+  // ---- AI 计算 Worker (移出主线程, 避免深 3-4 冻结 UI) ----
+  function ensureWorker() {
+    if (worker) return;
+    try {
+      worker = new Worker('/js/ai-worker.js?v=21');
+      worker.onmessage = (ev) => {
+        const { id, mv, err } = ev.data || {};
+        if (id !== workerSeq) return;  // 过期结果 (盘面已变)
+        computing = false;
+        if (err) { XQ.ui.showHint(null); return; }
+        XQ.ui.showHint(mv);
+      };
+      worker.onerror = () => { computing = false; XQ.ui.showHint(null); };
+    } catch (e) {
+      // Worker 不可用 (极老浏览器): 退化为同步计算
+      worker = null;
+    }
+  }
+
+  function computeAsync(map, side, depth, randomize, done) {
+    ensureWorker();
+    if (worker) {
+      workerSeq++;
+      worker.postMessage({ id: workerSeq, map, my: side, depth, randomize });
+      return;
+    }
+    // 退化: 同步 (旧浏览器)
+    try {
+      const mv = XQ.ai.getBestMove(map, side, depth, randomize);
+      done(mv);
+    } catch (e) {
+      done(null);
+    }
+  }
 
   // ---- 开关 + 难度 ----
   const btn = document.createElement('div');
@@ -53,7 +90,7 @@
   });
   slot.appendChild(levelRow);
 
-  // ---- 计算并显示提示 ----
+  // ---- 计算并显示提示 (异步 Worker, 不冻结 UI) ----
   function refresh() {
     const ui = XQ.ui;
     const st = ui.state;
@@ -64,16 +101,11 @@
     if (st.turn !== side) { ui.showHint(null); return; }  // 只提示自己的回合
     computing = true;
     const cfg = DEPTHS[level];
-    // 同步搜索 (深 2-4 几十到几百毫秒, 主线程可接受)
-    setTimeout(() => {
-      try {
-        const mv = XQ.ai.getBestMove(st.map, side, cfg, level === 'easy');
-        ui.showHint(mv);
-      } catch (e) {
-        ui.showHint(null);
-      }
+    computeAsync(st.map, side, cfg, level === 'easy', (mv) => {
+      if (!computing) return;  // 已被取消
       computing = false;
-    }, 0);
+      ui.showHint(mv);
+    });
   }
 
   // 盘面变化 → 防抖重算
