@@ -436,6 +436,11 @@
   }
 
   function bindControls() {
+    $('quitBtn').addEventListener('click', () => {
+      // 退出 → 回到大厅 (关闭 SSE 连接, 服务器清理房间成员)
+      if (es) es.close();
+      location.href = '/';
+    });
     $('undoBtn').addEventListener('click', () => {
       ensureAudio();
       api('undo', { room: myRoom, sid: mySid }).catch(e => showModal(e.message));
