@@ -104,12 +104,17 @@ async function main() {
   assert(JSON.stringify(last1.map) === JSON.stringify(last2.map), '双方棋盘一致');
   assert(last1.turn === 1, '轮到红方');
 
-  // 10. 悔棋 (撤 2 手)
+  // 10. 悔棋 (协商制: 请求 → 对方同意 → 悔请求者自己的上一步)
   const u1 = await api('undo', { room, sid: r2.sid });
-  assert(u1.ok, '悔棋成功');
+  assert(u1.ok, '悔棋请求成功');
+  await new Promise(res => setTimeout(res, 300));
+  const u2 = await api('undo-confirm', { room, sid: r1.sid });
+  assert(u2.ok, '对方同意悔棋');
   await new Promise(res => setTimeout(res, 400));
   const afterUndo = states1[states1.length - 1];
-  assert(afterUndo.history.length === 0, '悔棋后 history 清空');
+  // 黑 (r2) 请求 → 撤黑自己的 1 手 (黑最后走) → history 剩 1
+  assert(afterUndo.history.length === 1, `悔棋后 history 剩 1 (实际 ${afterUndo.history.length})`);
+  assert(afterUndo.turn === -1, '悔棋后轮到黑方 (请求者)');
 
   // 11. 重开
   const rs1 = await api('restart', { room, sid: r1.sid });

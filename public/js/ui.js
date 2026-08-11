@@ -330,7 +330,8 @@
       if (data.players.length >= 2) playSound('join');
       // 倒计时由 SSE 广播同步 (服务端权威), 此处不重置
     } catch (e) {
-      // 加入失败 (房间满等): 弹提示并回到进入页
+      // 加入失败 (房间满等): 弹提示并回到进入页; 清除可能失效的 sid (防 403 循环)
+      try { localStorage.removeItem('xq-sid:' + room); } catch (err) { /* 忽略 */ }
       showModal(e.message || '加入房间失败');
       setTimeout(() => { location.href = '/'; }, 1600);
     }
@@ -444,9 +445,6 @@
       const isRed = p.side === 1;
       const dot = document.querySelector(`.online-dot[data-for="${isRed ? 'p1' : 'p2'}"]`);
       if (dot) dot.classList.toggle('offline', !p.online);
-      // 同步自己视角 (我 = playerSide)
-      const meDot = document.querySelector(`.online-dot[data-for="${playerSide === 1 ? 'p1' : 'p2'}"]`);
-      if (meDot && p.sid === mySid) meDot.classList.toggle('offline', !p.online);
     }
   }
 

@@ -81,6 +81,7 @@ function roomState(room) {
       leaveTimes: new Map(), // sid -> {ts, name, side} (退出后 60s 内可凭 sid 恢复续局)
       roles: {},             // name -> side (角色归属持久: 退出重进同名恢复原角色)
       pendingUndo: null,     // { requester: sid, ts } 待对方确认的悔棋请求
+      pendingUndoTimer: null, // 悔棋请求 30s 超时定时器
       clockTimer: null,      // 自判超时定时器 (限时迭代+自判场景预留)
       map: rules.initMap(),
       turn: RED,
@@ -240,7 +241,7 @@ const BLOCKED = new Set(['secret.txt', '.gitignore', 'server.js', 'package.json'
 
 function injectHint(html) {
   return html.replace('</body>',
-    `<script src="/js/hint.js?v=18"></script></body>`);
+    `<script src="/js/hint.js?v=40"></script></body>`);
 }
 
 function readBody(req) {
@@ -426,8 +427,14 @@ async function handleRequest(req, res) {
         broadcast(rs, 'state', view(rs, 0));
         return json(res, 200, { ok: true, auto: true });
       }
-      // 两人: 设置 pending, 广播请求
+      // 两人: 设置 pending, 广播请求; 30s 自动超时清理 (防永久 pending)
       rs.pendingUndo = { requester: sid, ts: Date.now() };
+      rs.pendingUndoTimer = setTimeout(() => {
+        if (rs.pendingUndo) {
+          rs.pendingUndo = null;
+          broadcast(rs, 'undo_rejected', { by: null, timeout: true });
+        }
+      }, 30000);
       // 通知两方: 弹窗 + 倒计时
       broadcast(rs, 'undo_request', { requester: sid, ts: rs.pendingUndo.ts });
       return json(res, 200, { ok: true, pending: true });
@@ -440,6 +447,7 @@ async function handleRequest(req, res) {
       if (rs.pendingUndo.requester === sid) return json(res, 400, { error: '请等待对方回应' });
       const requester = rs.players.get(rs.pendingUndo.requester);
       executeUndo(rs, requester ? requester.side : RED);
+      if (rs.pendingUndoTimer) { clearTimeout(rs.pendingUndoTimer); rs.pendingUndoTimer = null; }
       rs.pendingUndo = null;
       broadcast(rs, 'state', view(rs, 0));
       return json(res, 200, { ok: true });
@@ -448,6 +456,7 @@ async function handleRequest(req, res) {
     // 悔棋协商: 拒绝
     if (url.pathname === '/api/undo-reject' && req.method === 'POST') {
       if (!rs.pendingUndo) return json(res, 400, { error: '没有待定悔棋请求' });
+      if (rs.pendingUndoTimer) { clearTimeout(rs.pendingUndoTimer); rs.pendingUndoTimer = null; }
       rs.pendingUndo = null;
       broadcast(rs, 'undo_rejected', { by: sid });
       return json(res, 200, { ok: true });
@@ -466,6 +475,7 @@ async function handleRequest(req, res) {
       rs.turn = RED;
       // 重置 clockVisible / pendingUndo
       rs.clockVisible = false;
+      if (rs.pendingUndoTimer) { clearTimeout(rs.pendingUndoTimer); rs.pendingUndoTimer = null; }
       rs.pendingUndo = null;
       if (rs.clockTimer) { clearTimeout(rs.clockTimer); rs.clockTimer = null; }
       resetClock(rs);
