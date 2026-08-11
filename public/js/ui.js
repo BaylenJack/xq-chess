@@ -438,8 +438,9 @@
       const tx = toEl.getBoundingClientRect().left + toEl.offsetWidth / 2;
       const ty = toEl.getBoundingClientRect().top + toEl.offsetHeight / 2;
       const boardRect = boardEl.getBoundingClientRect();
-      for (let i = 1; i <= 5; i++) {
-        const t = i / 6;
+      const sparkCount = document.body.classList.contains('lite') ? 0 : 3;  // 轻量: 3 颗粒子足够
+      for (let i = 1; i <= sparkCount; i++) {
+        const t = i / 4;
         const spark = el('div', 'move-spark');
         const x = fx + (tx - fx) * t;
         const y = fy + (ty - fy) * t - Math.sin(t * Math.PI) * (boardRect.width * 0.12);

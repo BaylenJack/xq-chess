@@ -800,23 +800,18 @@ html, body {
   justify-content: center;
   position: relative;
   background:
-    /* 顶部高光 */
+    /* 顶部高光 (合并进主渐变, 减少合成层) */
     radial-gradient(circle at 36% 26%, rgba(255, 245, 215, .85) 0%, transparent 28%),
     radial-gradient(circle at 32% 28%, var(--wood-hi) 0%, var(--wood) 35%, var(--wood-mid) 75%, var(--wood-dark) 100%);
   border: 2px solid var(--wood-edge);
   box-shadow:
-    /* 落地阴影 */
-    0 6px 12px rgba(0, 0, 0, .55),
-    0 2px 4px rgba(0, 0, 0, .4),
-    /* 顶部内嵌高光 */
-    inset 0 2px 2px rgba(255, 240, 200, .55),
-    inset 0 -3px 6px rgba(60, 35, 10, .45),
-    /* 边缘深色 */
-    inset 2px 2px 4px rgba(255, 230, 170, .25),
-    inset -2px -2px 4px rgba(40, 22, 8, .4),
-    /* 烫金外环 (模拟 1.5px 金线) */
+    /* 落地阴影 + 烫金外环 (合并 3 层为 2 层) */
+    0 4px 8px rgba(0, 0, 0, .5),
     0 0 0 1px var(--gold-3),
-    0 0 0 2.5px rgba(60, 38, 16, .8);
+    0 0 0 2.5px rgba(60, 38, 16, .8),
+    /* 内嵌高光 + 边缘 (合并 4 层为 2 层) */
+    inset 0 2px 2px rgba(255, 240, 200, .5),
+    inset 0 -2px 4px rgba(60, 35, 10, .4);
   cursor: default;
   transition: transform .18s var(--ease-spring), box-shadow .18s var(--ease-out);
   pointer-events: none;
