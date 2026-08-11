@@ -196,6 +196,11 @@
       const nameEl = p2.querySelector('.name');
       if (nameEl) nameEl.textContent = (st.players || []).find(p => p.side === -1)?.name || '等待…';
     }
+    // 同步倒计时条上的玩家名
+    const tp1 = document.getElementById('timer-p1');
+    const tp2 = document.getElementById('timer-p2');
+    if (tp1) tp1.textContent = (st.players || []).find(p => p.side === 1)?.name || '红方';
+    if (tp2) tp2.textContent = (st.players || []).find(p => p.side === -1)?.name || '黑方';
     if (st.status !== G.STATUS.PLAYING) {
       $('status').textContent = st.status === G.STATUS.RED_WIN ? '红方胜！' : '黑方胜！';
     } else {
@@ -423,6 +428,14 @@
     $('restartBtn').addEventListener('click', () => {
       api('restart', { room: myRoom, sid: mySid }).catch(e => showModal(e.message));
     });
+    // 倒计时暂停/恢复按钮
+    const toggleBtn = document.getElementById('timerToggleBtn');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        XQ.timer.togglePause();
+        playSound('select');
+      });
+    }
     XQ.timer.onExpire(() => {
       playSound('timeout');
       api('timeout', { room: myRoom, sid: mySid }).catch(() => {});
