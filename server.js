@@ -80,6 +80,8 @@ function roomState(room) {
       players: new Map(),   // sid -> {sid, name, side, stream}
       leaveTimes: new Map(), // sid -> {ts, name, side} (退出后 60s 内可凭 sid 恢复续局)
       roles: {},             // name -> side (角色归属持久: 退出重进同名恢复原角色)
+      pendingUndo: null,     // { requester: sid, ts } 待对方确认的悔棋请求
+      clockTimer: null,      // 自判超时定时器 (限时迭代+自判场景预留)
       map: rules.initMap(),
       turn: RED,
       history: [],
@@ -105,6 +107,18 @@ function broadcast(rs, event, data) {
   for (const p of rs.players.values()) {
     try { p.stream.write(payload); } catch (e) { /* 客户端断开 */ }
   }
+}
+
+// 悔棋: 退 1 步 (悔自己走的那手); 还原 turn = 走出该步的人的颜色
+function executeUndo(rs) {
+  if (rs.history.length === 0) return;
+  const rec = rs.history.pop();
+  rules.undoMove(rs.map, rec.mv, rec.captured);
+  rs.status = PLAYING; rs.check = false;
+  rs.lastMove = rs.history.length ? rs.history[rs.history.length - 1] : null;
+  rs.turn = rules.isRed(rec.piece) ? RED : BLACK;
+  rs.check = rules.inCheck(rs.map, rs.turn);
+  resetClock(rs);
 }
 
 // 倒计时: 重置 (走子/开局/悔棋/重开后调用); 附带服务端自判超时 (客户端断线也能判负)
@@ -353,26 +367,59 @@ async function handleRequest(req, res) {
 
     // 悔棋 (双方同意制: 任一玩家请求即撤一轮)
     if (url.pathname === '/api/undo' && req.method === 'POST') {
+      if (rs.status !== PLAYING) return json(res, 400, { error: '对局已结束' });
       if (rs.history.length === 0) return json(res, 400, { error: '没有可悔的棋' });
-      const n = Math.min(2, rs.history.length);
-      for (let i = 0; i < n; i++) {
-        const rec = rs.history.pop();
-        rules.undoMove(rs.map, rec.mv, rec.captured);
+      // 已存在待定请求: 不重复发起
+      if (rs.pendingUndo) return json(res, 409, { error: '已有待定悔棋请求' });
+      // 仅一人时: 直接悔棋 (无需等对方)
+      if (rs.players.size < 2) {
+        executeUndo(rs);
+        broadcast(rs, 'state', view(rs, 0));
+        return json(res, 200, { ok: true, auto: true });
       }
-      rs.status = PLAYING; rs.check = false;
-      rs.lastMove = rs.history.length ? rs.history[rs.history.length - 1] : null;
-      // 悔棋后轮到走棋方: 历史偶数手 → 红方, 奇数手 → 黑方
-      rs.turn = rs.history.length % 2 === 0 ? RED : BLACK;
-      rs.check = rules.inCheck(rs.map, rs.turn);
-      resetClock(rs);
+      // 两人: 设置 pending, 广播请求
+      rs.pendingUndo = { requester: sid, ts: Date.now() };
+      // 通知两方: 弹窗 + 倒计时
+      broadcast(rs, 'undo_request', { requester: sid, ts: rs.pendingUndo.ts });
+      return json(res, 200, { ok: true, pending: true });
+    }
+
+    // 悔棋协商: 同意
+    if (url.pathname === '/api/undo-confirm' && req.method === 'POST') {
+      if (!rs.pendingUndo) return json(res, 400, { error: '没有待定悔棋请求' });
+      // 只能由"对方"确认 (非请求方)
+      if (rs.pendingUndo.requester === sid) return json(res, 400, { error: '请等待对方回应' });
+      executeUndo(rs);
+      rs.pendingUndo = null;
       broadcast(rs, 'state', view(rs, 0));
       return json(res, 200, { ok: true });
     }
 
-    // 重开
+    // 悔棋协商: 拒绝
+    if (url.pathname === '/api/undo-reject' && req.method === 'POST') {
+      if (!rs.pendingUndo) return json(res, 400, { error: '没有待定悔棋请求' });
+      rs.pendingUndo = null;
+      broadcast(rs, 'undo_rejected', { by: sid });
+      return json(res, 200, { ok: true });
+    }
+
+    // 重开 (双方互换颜色 + 交换先手)
     if (url.pathname === '/api/restart' && req.method === 'POST') {
-      rs.map = rules.initMap(); rs.turn = RED; rs.history = []; rs.status = PLAYING; rs.check = false; rs.lastMove = null;
+      rs.map = rules.initMap(); rs.history = []; rs.status = PLAYING; rs.check = false; rs.lastMove = null;
+      // 交换两方颜色: 红 <-> 黑
+      for (const p of rs.players.values()) {
+        const newSide = -p.side;
+        p.side = newSide;
+        if (rs.roles[p.name] !== undefined) rs.roles[p.name] = newSide;
+      }
+      // 交换先手: 取原 turn 相反 (上一局的输家执红先手)
+      rs.turn = -rs.turn;
+      // 重置 clockVisible / pendingUndo
+      rs.clockVisible = false;
+      rs.pendingUndo = null;
+      if (rs.clockTimer) { clearTimeout(rs.clockTimer); rs.clockTimer = null; }
       resetClock(rs);
+      broadcast(rs, 'start', { players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })) });
       broadcast(rs, 'state', view(rs, 0));
       return json(res, 200, { ok: true });
     }

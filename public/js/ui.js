@@ -398,6 +398,19 @@
       const s = JSON.parse(ev.data);
       showModal(s.message || '对手离开了');
     });
+    // 悔棋请求: 弹窗询问对方 (非请求方)
+    es.addEventListener('undo_request', async ev => {
+      const s = JSON.parse(ev.data);
+      if (s.requester === mySid) return;   // 自己提的: 已在 showUndoPending
+      const ok = await askUndoConfirm();
+      api(ok ? 'undo-confirm' : 'undo-reject', { room: myRoom, sid: mySid })
+        .catch(e => showModal(e.message));
+    });
+    // 悔棋被拒
+    es.addEventListener('undo_rejected', () => {
+      hideUndoPending();
+      showModal('对方拒绝了你的悔棋请求');
+    });
     es.addEventListener('error', () => {
       // EventSource 断线: 显示断线状态 (会自动重连, 重连后 server 推送最新 state)
       const statusEl = $('status');
@@ -468,43 +481,132 @@
   }
 
   function bindControls() {
-    $('quitBtn').addEventListener('click', () => {
-      // 退出 → 回到大厅 (关闭 SSE 连接, 服务器清理房间成员)
-      if (es) es.close();
-      location.href = '/';
-    });
-    $('undoBtn').addEventListener('click', () => {
-      ensureAudio();
-      api('undo', { room: myRoom, sid: mySid }).catch(e => showModal(e.message));
-    });
-    $('restartBtn').addEventListener('click', () => {
-      api('restart', { room: myRoom, sid: mySid }).catch(e => showModal(e.message));
-    });
     // 倒计时按钮: 开关走服务端广播, 双方同步显隐
     const timerBtn = document.getElementById('timerBtn');
-    const timerDisplay = document.getElementById('timerDisplay');
-    if (timerBtn && timerDisplay) {
+    if (timerBtn) {
       timerBtn.addEventListener('click', () => {
         ensureAudio();
-        // 本地不切换, 等 server 广播 state 后再切 (clockVisible 同步)
         api('clock-toggle', { room: myRoom, sid: mySid }).catch(() => {});
         playSound('select');
       });
     }
-    // 根据 server 广播的 clockVisible 同步显隐
+    // 思考按钮: 单击=普通(深 4 / 6s), 长按=深度(深 10 / 15s)
+    bindThinkBtn();
+
+    // 悔棋: 发起请求 → 等待对方同意/拒绝
+    $('undoBtn').addEventListener('click', () => {
+      ensureAudio();
+      api('undo', { room: myRoom, sid: mySid })
+        .then(res => {
+          if (res.pending) {
+            showUndoPending();   // 显示"等待对方确认"模态
+          } else if (res.auto) {
+            showModal('已悔棋');
+          }
+        })
+        .catch(e => showModal(e.message));
+    });
+
+    // 重新开始: 双方互换颜色 + 交换先手 (服务端处理)
+    $('restartBtn').addEventListener('click', () => {
+      if (!confirm('重新开始?双方将互换棋色和先手')) return;
+      api('restart', { room: myRoom, sid: mySid })
+        .catch(e => showModal(e.message));
+    });
+
+    // 倒计时面板显隐 (服务端广播)
     function applyClockVisible(v) {
-      if (!timerBtn || !timerDisplay) return;
+      if (!timerBtn) return;
       const show = !!v;
-      timerDisplay.classList.toggle('hidden', !show);
+      const timerDisplay = document.getElementById('timerDisplay');
+      if (timerDisplay) timerDisplay.classList.toggle('hidden', !show);
       timerBtn.classList.toggle('active', show);
-      if (!show) {
-        XQ.timer.stop();
-      }
+      if (!show) XQ.timer.stop();
     }
     XQ.applyClockVisible = applyClockVisible;
     XQ.timer.onExpire(() => {
       playSound('timeout');
       api('timeout', { room: myRoom, sid: mySid }).catch(() => {});
+    });
+  }
+
+  // 思考按钮: 单击/长按双模式 (借鉴移动端 long-press 交互)
+  const LONG_PRESS_MS = 600;
+  let thinkTimer = null, thinkPressed = false;
+  function bindThinkBtn() {
+    const btn = $('thinkBtn');
+    if (!btn) return;
+    const startThink = (deep) => {
+      if (XQ.thinking) return;   // 已在思考
+      XQ.thinking = true;
+      btn.classList.add('thinking');
+      // 触发: 走棋方到自己时, 显示提示
+      const onTurn = () => {
+        if (!XQ.thinking) return;
+        if (st.status !== G.STATUS.PLAYING || st.turn !== playerSide) return;
+        XQ.ai.startHint(deep ? 'hard' : 'medium', playerSide);
+      };
+      onTurn();
+      XQ.thinkPoll = setInterval(onTurn, 300);   // 持续检查是否轮到自己
+    };
+    const endThink = () => {
+      XQ.thinking = false;
+      clearTimeout(thinkTimer);
+      clearInterval(XQ.thinkPoll);
+      btn.classList.remove('thinking');
+      XQ.ai.stopHint();
+    };
+    // 鼠标 / 触摸通用
+    const onDown = (e) => {
+      e.preventDefault();
+      thinkPressed = true;
+      clearTimeout(thinkTimer);
+      thinkTimer = setTimeout(() => { if (thinkPressed) { btn.classList.add('deep'); startThink(true); } }, LONG_PRESS_MS);
+    };
+    const onUp = () => {
+      if (!thinkPressed) return;
+      thinkPressed = false;
+      clearTimeout(thinkTimer);
+      if (btn.classList.contains('deep')) {
+        // 长按: 已启动深度思考, 松开不立即关, 用户需再次点按钮关闭
+        btn.classList.remove('deep');
+      } else {
+        // 单击: 普通思考, 触发一次即可
+        startThink(false);
+        setTimeout(endThink, 8000);  // 普通思考 8 秒后自动结束
+      }
+    };
+    btn.addEventListener('mousedown', onDown);
+    btn.addEventListener('touchstart', onDown, { passive: false });
+    btn.addEventListener('mouseup', onUp);
+    btn.addEventListener('mouseleave', () => { if (thinkPressed && !btn.classList.contains('deep')) endThink(); });
+    btn.addEventListener('touchend', onUp);
+    btn.addEventListener('touchcancel', endThink);
+    // 再次点击: 关闭
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (XQ.thinking) endThink();
+    });
+  }
+
+  function showUndoPending() {
+    const m = document.getElementById('undoRequestModal');
+    if (!m) return;
+    m.classList.remove('hidden');
+    setTimeout(() => {
+      if (!m.classList.contains('hidden')) {
+        m.classList.add('hidden');
+        showModal('悔棋请求超时, 请重试');
+      }
+    }, 30000);
+  }
+  function hideUndoPending() { document.getElementById('undoRequestModal')?.classList.add('hidden'); }
+
+  // 悔棋协商 UI: 对方请求时弹窗询问
+  function askUndoConfirm() {
+    return new Promise((resolve) => {
+      const yes = confirm('对方请求悔棋,是否同意?');
+      resolve(yes);
     });
   }
 

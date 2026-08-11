@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>对弈 · 中国象棋</title>
-  <link rel="stylesheet" href="/css/style.css?v=29">
+  <link rel="stylesheet" href="/css/style.css?v=30">
 </head>
 <body class="game-body">
 
@@ -50,29 +50,31 @@
 
   <footer class="game-controls">
     <div class="timer-row">
-      <button id="timerBtn" class="timer-btn">⏱ 倒计时</button>
-      <div id="timerDisplay" class="timer-display hidden">
-        <span class="timer-num" id="clock-main">60</span>
+      <button id="timerBtn" class="timer-btn" aria-label="切换倒计时">⏱</button>
+      <div id="timerDisplay" class="timer-inline hidden">
+        <span class="timer-num" id="clock-main">60</span><span class="timer-unit">s</span>
       </div>
+      <button id="undoBtn" class="ctrl-btn">悔棋</button>
     </div>
     <div class="control-row">
-      <button id="quitBtn" class="ctrl-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        退出
+      <button id="thinkBtn" class="ctrl-btn think-btn" aria-label="单击普通思考 / 长按深度思考">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 21h6"/><path d="M12 17v4"/><path d="M5 8a7 7 0 0 1 14 0c0 3-3 4-3 8H8c0-4-3-5-3-8z"/>
+        </svg>
+        <span class="think-label">思考</span>
       </button>
-      <button id="undoBtn" class="ctrl-btn">悔棋</button>
       <button id="restartBtn" class="ctrl-btn">重新开始</button>
     </div>
-    <div id="hintSlot" class="hint-slot"></div>
+    <div id="undoRequestModal" class="modal hidden"><div class="modal-card">等待对方确认悔棋…</div></div>
   </footer>
 
   <div id="modal" class="modal"><div class="modal-card"></div></div>
 
-  <script src="/js/rules.js?v=28"></script>
-  <script src="/js/ai.js?v=28"></script>
-  <script src="/js/game.js?v=28"></script>
-  <script src="/js/ui.js?v=28"></script>
-  <script src="/js/timer.js?v=28"></script>
+  <script src="/js/rules.js?v=30"></script>
+  <script src="/js/ai.js?v=30"></script>
+  <script src="/js/game.js?v=30"></script>
+  <script src="/js/ui.js?v=30"></script>
+  <script src="/js/timer.js?v=30"></script>
   <script>
     window.addEventListener('DOMContentLoaded', () => XQ.ui.init());
   </script>
