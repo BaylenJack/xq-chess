@@ -712,15 +712,12 @@ html, body {
   background:
     repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--cell) - 1.5px), var(--wood-deep) calc(var(--cell) - 1.5px), var(--wood-deep) var(--cell));
 }
-/* 九宫斜线 (两个对角线) */
+/* 九宫斜线已移除 */
 .board-wrap .grid-lines::before {
   content: '';
   position: absolute;
   inset: 0;
-  background:
-    /* 上九宫 (红方) - 在 board 的 0-2 行 */
-    linear-gradient(to bottom right, transparent 47.5%, var(--wood-deep) 47.5% 48%, transparent 48%, transparent 52%, var(--wood-deep) 52% 52.5%, transparent 52.5%),
-    linear-gradient(to bottom left, transparent 47.5%, var(--wood-deep) 47.5% 48%, transparent 48%, transparent 52%, var(--wood-deep) 52% 52.5%, transparent 52.5%);
+  background: none;
 }
 
 /* 楚河汉界 (z 2, 覆盖 grid) */
