@@ -196,11 +196,6 @@
       const nameEl = p2.querySelector('.name');
       if (nameEl) nameEl.textContent = (st.players || []).find(p => p.side === -1)?.name || '等待…';
     }
-    // 同步倒计时条上的玩家名
-    const tp1 = document.getElementById('timer-p1');
-    const tp2 = document.getElementById('timer-p2');
-    if (tp1) tp1.textContent = (st.players || []).find(p => p.side === 1)?.name || '红方';
-    if (tp2) tp2.textContent = (st.players || []).find(p => p.side === -1)?.name || '黑方';
     if (st.status !== G.STATUS.PLAYING) {
       $('status').textContent = st.status === G.STATUS.RED_WIN ? '红方胜！' : '黑方胜！';
     } else {
@@ -325,11 +320,8 @@
           showModal('🎉 对手离开 · 你赢了');
         }
         XQ.timer.disable();
-      } else if (s.turn !== st.turn) {
-        // 回合切换 → 切换计时器到对方
-        XQ.timer.switchSide(s.turn);
       } else if (last) {
-        // 同回合 (如悔棋) → 重置
+        // 对方走子 → 倒计时重置 (轮流制)
         XQ.timer.reset();
       }
       selected = null; legalNow = []; illegalNow = []; clearHint();
@@ -428,11 +420,22 @@
     $('restartBtn').addEventListener('click', () => {
       api('restart', { room: myRoom, sid: mySid }).catch(e => showModal(e.message));
     });
-    // 倒计时暂停/恢复按钮
-    const toggleBtn = document.getElementById('timerToggleBtn');
-    if (toggleBtn) {
-      toggleBtn.addEventListener('click', () => {
-        XQ.timer.togglePause();
+    // 倒计时按钮: 显示/隐藏 单个倒计时
+    const timerBtn = document.getElementById('timerBtn');
+    const timerDisplay = document.getElementById('timerDisplay');
+    if (timerBtn && timerDisplay) {
+      timerBtn.addEventListener('click', () => {
+        ensureAudio();
+        const hidden = timerDisplay.classList.contains('hidden');
+        timerDisplay.classList.toggle('hidden');
+        timerBtn.classList.toggle('active', !hidden ? false : true);
+        if (!hidden) {
+          // 关闭 → 停表
+          XQ.timer.stop();
+        } else {
+          // 打开 → 开始倒计时
+          XQ.timer.reset();
+        }
         playSound('select');
       });
     }

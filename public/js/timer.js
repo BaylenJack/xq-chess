@@ -1,54 +1,29 @@
 /*!
- * xq-chess 倒计时引擎
- * 每回合 60s 倒数: 当前回合玩家的时间递减, 对手冻结。
- * ≤10s 加 .danger 闪烁; 到 0 上报 /api/timeout。
- * 显示在棋盘下方 (红 Xs | ⏸按钮 | Xs 黑), 按钮可暂停/恢复。
+ * xq-chess 倒计时 (简化版)
+ * 一个按钮 + 单个倒计时: 点按钮弹出倒计时, 对方走完子自动重置, 轮流使用。
+ * ≤10s 红色闪烁; 到 0 上报 /api/timeout。
  */
 (function (root) {
   'use strict';
 
   const DEFAULT_SECONDS = 60;
   const TICK_MS = 100;
-  let t1 = DEFAULT_SECONDS, t2 = DEFAULT_SECONDS;
   let cur = DEFAULT_SECONDS;
-  let curSide = 1;
   let iv = null;
   let reported = false;
-  let paused = false;
+  let running = false;
   let onExpireCb = null;
 
-  function getEl(side) {
-    return document.getElementById(side === 1 ? 'clock-1' : 'clock-2');
-  }
-  function getSideEl(side) {
-    return document.querySelector('.timer-side[data-side="' + side + '"]');
-  }
+  function getEl() { return document.getElementById('clock-main'); }
   function render() {
-    const el1 = getEl(1), el2 = getEl(-1);
-    if (el1) {
-      const v = curSide === 1 ? cur : t1;
-      el1.textContent = String(Math.ceil(v));
-      el1.classList.toggle('danger', curSide === 1 && cur <= 10 && !paused);
-    }
-    if (el2) {
-      const v = curSide === -1 ? cur : t2;
-      el2.textContent = String(Math.ceil(v));
-      el2.classList.toggle('danger', curSide === -1 && cur <= 10 && !paused);
-    }
-    // 高亮当前回合方
-    const s1 = getSideEl(1), s2 = getSideEl(-1);
-    if (s1) s1.classList.toggle('active', curSide === 1 && !paused);
-    if (s2) s2.classList.toggle('active', curSide === -1 && !paused);
-    // 暂停按钮状态
-    const btn = document.getElementById('timerToggleBtn');
-    if (btn) {
-      btn.textContent = paused ? '▶' : '⏸';
-      btn.classList.toggle('paused', paused);
+    const el = getEl();
+    if (el) {
+      el.textContent = String(Math.ceil(cur));
+      el.classList.toggle('danger', running && cur <= 10);
     }
   }
 
   function tick() {
-    if (paused) return;
     if (cur <= 0) {
       if (!reported) {
         reported = true;
@@ -58,7 +33,6 @@
       return;
     }
     cur = Math.max(0, +(cur - TICK_MS / 1000).toFixed(2));
-    if (curSide === 1) t1 = cur; else t2 = cur;
     render();
   }
 
@@ -66,24 +40,16 @@
     if (iv) return;
     render();
     iv = setInterval(tick, TICK_MS);
+    running = true;
   }
   function stop() {
     if (iv) { clearInterval(iv); iv = null; }
+    running = false;
   }
-  function switchSide(side) {
-    if (curSide === 1) t1 = cur; else t2 = cur;
-    curSide = side;
-    cur = side === 1 ? t1 : t2;
-    reported = false;
-    render();
-    start();
-  }
+  // 对方走子 → 重置
   function reset() {
-    t1 = DEFAULT_SECONDS; t2 = DEFAULT_SECONDS;
     cur = DEFAULT_SECONDS;
-    curSide = 1;
     reported = false;
-    paused = false;
     render();
     start();
   }
@@ -92,27 +58,13 @@
     reported = true;
     render();
   }
-  // 暂停/恢复切换
-  function togglePause() {
-    paused = !paused;
-    render();
-    if (!paused) start();
-    return paused;
-  }
-  function setPaused(v) {
-    paused = !!v;
-    render();
-    if (!paused) start();
-  }
 
   const timer = {
     DEFAULT_SECONDS,
-    start, stop, reset, disable, switchSide,
-    togglePause, setPaused,
+    start, stop, reset, disable,
     onExpire(fn) { onExpireCb = fn; },
     get cur() { return cur; },
-    get side() { return curSide; },
-    get paused() { return paused; },
+    get running() { return running; },
   };
 
   root.XQ = root.XQ || {};

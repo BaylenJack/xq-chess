@@ -1049,82 +1049,58 @@ html, body {
   margin-top: 16px;
 }
 
-/* 倒计时条 (棋盘下方) */
-.timer-bar {
+/* 倒计时 (单计时器: 按钮 + 数字) */
+.timer-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: linear-gradient(180deg, rgba(46, 36, 24, .8), rgba(28, 18, 10, .8));
-  border: 1px solid rgba(184, 137, 67, .25);
+  justify-content: center;
+  gap: 12px;
+}
+.timer-btn {
+  padding: 10px 20px;
+  border: 1px solid var(--gold-2);
   border-radius: var(--r-md);
-  box-shadow:
-    var(--shadow-1),
-    inset 0 1px 0 rgba(255, 220, 160, .08);
-}
-.timer-side {
-  flex: 1;
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 6px 10px;
-  border-radius: var(--r-sm);
-  transition: all .3s var(--ease-out);
-}
-.timer-side.active {
-  background: rgba(232, 182, 76, .12);
-  box-shadow: inset 0 0 0 1px var(--gold-2), 0 0 12px var(--gold-glow);
-}
-.timer-name {
+  background: linear-gradient(180deg, rgba(90, 72, 48, .9), rgba(58, 46, 30, .9));
+  color: var(--gold-3);
   font-family: var(--font-serif);
   font-size: var(--fs-sm);
-  color: var(--ink-2);
-  letter-spacing: 1px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 90px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all .2s var(--ease-out);
+  box-shadow: var(--shadow-1), inset 0 1px 0 rgba(255, 220, 160, .1);
 }
-.timer-side.active .timer-name { color: var(--gold-3); }
-.timer-num {
-  font-family: var(--font-mono);
-  font-size: 24px;
-  font-weight: bold;
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-1);
-  min-width: 34px;
+.timer-btn:hover {
+  border-color: var(--gold-3);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-2), 0 0 12px var(--gold-glow);
+}
+.timer-btn:active { transform: translateY(0); }
+.timer-btn.active {
+  background: linear-gradient(180deg, rgba(232, 182, 76, .2), rgba(168, 123, 40, .15));
+  border-color: var(--gold-3);
+}
+.timer-display {
+  min-width: 68px;
+  padding: 8px 14px;
+  border-radius: var(--r-md);
+  background: rgba(0, 0, 0, .45);
+  border: 1px solid var(--gold-2);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, .4), 0 0 10px var(--gold-glow);
   text-align: center;
 }
-.timer-side.active .timer-num { color: var(--gold-4); }
+.timer-num {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold-4);
+}
 .timer-num.danger {
   color: var(--danger);
   text-shadow: 0 0 8px var(--danger-glow);
   animation: clock-danger 0.8s ease-in-out infinite;
 }
-.timer-toggle {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid var(--gold-2);
-  background: linear-gradient(180deg, rgba(90, 72, 48, .9), rgba(58, 46, 30, .9));
-  color: var(--gold-3);
-  font-size: 15px;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all .2s var(--ease-out);
-  box-shadow: var(--shadow-1), inset 0 1px 0 rgba(255, 220, 160, .1);
-}
-.timer-toggle:hover {
-  border-color: var(--gold-3);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-2), 0 0 12px var(--gold-glow);
-}
-.timer-toggle:active { transform: translateY(0); }
-.timer-toggle.paused {
-  background: linear-gradient(180deg, rgba(232, 182, 76, .25), rgba(168, 123, 40, .2));
-  border-color: var(--gold-3);
-  color: var(--gold-4);
-}
+.timer-btn:active { transform: translateY(0); }
 
 .control-row {
   display: flex;

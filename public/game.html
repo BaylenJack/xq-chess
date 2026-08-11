@@ -49,15 +49,10 @@
   </section>
 
   <footer class="game-controls">
-    <div class="timer-bar">
-      <div class="timer-side" data-side="1">
-        <span class="timer-name" id="timer-p1">红方</span>
-        <span class="timer-num" id="clock-1">60</span>
-      </div>
-      <button id="timerToggleBtn" class="timer-toggle" title="暂停/继续倒计时">⏸</button>
-      <div class="timer-side" data-side="-1">
-        <span class="timer-num" id="clock-2">60</span>
-        <span class="timer-name" id="timer-p2">黑方</span>
+    <div class="timer-row">
+      <button id="timerBtn" class="timer-btn">⏱ 倒计时</button>
+      <div id="timerDisplay" class="timer-display hidden">
+        <span class="timer-num" id="clock-main">60</span>
       </div>
     </div>
     <div class="control-row">
@@ -69,11 +64,11 @@
 
   <div id="modal" class="modal"><div class="modal-card"></div></div>
 
-  <script src="/js/rules.js?v=12"></script>
-  <script src="/js/ai.js?v=12"></script>
-  <script src="/js/game.js?v=12"></script>
-  <script src="/js/ui.js?v=12"></script>
-  <script src="/js/timer.js?v=12"></script>
+  <script src="/js/rules.js?v=13"></script>
+  <script src="/js/ai.js?v=13"></script>
+  <script src="/js/game.js?v=13"></script>
+  <script src="/js/ui.js?v=13"></script>
+  <script src="/js/timer.js?v=13"></script>
   <script>
     window.addEventListener('DOMContentLoaded', () => XQ.ui.init());
   </script>
