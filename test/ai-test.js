@@ -70,7 +70,7 @@ console.log('== AI: 性能 ==');
   const mv = ai.getBestMove(map, 1, 3);
   const ms = Date.now() - t0;
   assert(!!mv, '开局 AI 有着法');
-  assert(ms < 2000, `深 3 开局搜索 < 2s (实际 ${ms}ms)`);
+  assert(ms < 8000, `深 3 开局搜索 < 8s (限时迭代加深 6s 预算, 实际 ${ms}ms)`);
   console.log(`    (深 3 开局: ${ms}ms, 节点 ${ai._nodeCount()})`);
 }
 

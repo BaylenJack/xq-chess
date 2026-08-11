@@ -177,6 +177,7 @@
   let nodeCount = 0;
   let searchDepth = 3;   // 当前搜索总深度 (深2禁用静态搜索, 防浅层贪吃长局)
   let nodeBudget = Infinity;   // 当前搜索的节点预算 (超限抛 budget-exceeded, 用已搜结果兜底)
+  let deadline = Infinity;     // 当前搜索截止时间戳 (限时迭代加深用)
   const TYPE_IDX = { R: 0, H: 1, C: 2, E: 3, A: 4, P: 5, K: 6 };
 
   // ---- Zobrist 哈希 + 置换表 (Transposition Table, 借鉴 ChineseChess zobrist) ----
@@ -286,6 +287,7 @@
     nodeCount++;
     if (nodeCount > nodeBudget) throw new Error('budget-exceeded');
     if (nodeCount > MAX_NODES) throw new Error('nodes-exceeded');
+    if (Date.now() > deadline) throw new Error('time-exceeded');
 
     const stand = my * evaluate(map);
     if (stand >= beta) return stand;   // 超出上界, 剪枝
@@ -327,6 +329,7 @@
     nodeCount++;
     if (nodeCount > nodeBudget) throw new Error('budget-exceeded');
     if (nodeCount > MAX_NODES) throw new Error('nodes-exceeded');
+    if (Date.now() > deadline) throw new Error('time-exceeded');
 
     // 置换表查询 (借鉴 ChineseChess TranspositionTable)
     const origHash = curHash;
@@ -462,71 +465,41 @@
    * @param {boolean} randomize 弱化: 同分着法随机 (菜鸟档)
    * @returns {{fr:{r,c},to:{r,c},piece,score}|null} 最佳着法; 无着法返回 null
    */
+  // 限时迭代加深 (Time-Controlled Iterative Deepening):
+  // 从深 3 开始逐层加深, 每层用掉 15s 预算的一部分; 时间到 → 返回已完成的最高层结果
+  // 借鉴经典引擎 (pengjiu/ChineseChess AICoreHandler) 的 time-managed 搜索思想
+  const TIME_LIMIT_MS = 15000;   // 高手档总预算 15s (用户可接受延迟)
   function getBestMove(map, my, depth, randomize) {
     const moves = R.legalMoves(map, my);
     if (moves.length === 0) return null;
 
-    // 迭代加深: 深 5 时先跑深 4 (快), 再尝试深 5; 深 5 超预算 → 用深 4 结果兜底
-    // 深度自适应: 开局子多 (分支因子大) 自动降深 4, 中残局子少才深 5 (提示响应快)
-    if (depth >= 5) {
-      if (pieceCount(map) > 22) return getBestMove(map, my, 4, randomize);
-      const d4 = getBestMove(map, my, 4, randomize);
-      // 预算: 深 5 给 2 倍深 4 预算, 超出即用 d4
-      const d5Budget = (DEPTH_BUDGET[4] || MAX_NODES) * 2;
+    initZobrist();
+
+    // 深 ≤2 (测试/快速档): 直接单层 alpha-beta, 不走限时迭代
+    if (depth <= 2) {
       nodeCount = 0;
-      searchDepth = 5;
+      searchDepth = depth;
       clearHistory();
       TT.clear();
       sortMoves(moves, map);
       curHash = boardHash(map);
-      nodeBudget = d5Budget;
+      nodeBudget = DEPTH_BUDGET[depth] || MAX_NODES;
+      deadline = Infinity;
+      let alpha = -Infinity;
+      const beta = Infinity;
+      let bestMove = null, bestScore = -Infinity;
       try {
-        const mv = mtdf(map, my, 5, d4 ? d4.score : 0);
-        if (mv) { mv.score = mv.score !== undefined ? mv.score : (d4 ? d4.score : 0); return mv; }
-      } catch (e) {
-        if (e.message !== 'nodes-exceeded' && e.message !== 'budget-exceeded') throw e;
-      }
-      // 深 5 失败 → 返回深 4 结果
-      return d4;
-    }
-
-    nodeCount = 0;
-    searchDepth = depth;
-    clearHistory();   // 历史启发仅本次搜索有效
-    initZobrist();    // 置换表哈希
-    TT.clear();
-    sortMoves(moves, map);   // 吃子优先 + 历史启发
-    curHash = boardHash(map);
-
-    // 节点预算: 超限抛 budget-exceeded, 用已搜结果兜底 (保证响应速度)
-    nodeBudget = DEPTH_BUDGET[depth] || MAX_NODES;
-
-    let bestMove = null;
-    let bestScore = -Infinity;
-
-    try {
-      // 深 ≥3: MTD(f) 迭代收敛 (借鉴 AICoreHandler); 深 2 保持简单 alpha-beta (菜鸟档随机化兼容)
-      if (depth >= 3) {
-        // 初始猜测: 静态评估
-        let guess = evaluate(map) * (my > 0 ? 1 : -1);
-        const mv = mtdf(map, my, depth, guess);
-        if (mv) { bestMove = mv; bestScore = mv.score !== undefined ? mv.score : 0; }
-      } else {
-        let alpha = -Infinity;
-        const beta = Infinity;
         for (const mv of moves) {
           const captured = R.makeMove(map, mv);
           hashApply(mv, captured);
           let score;
           if (captured && R.pieceType(captured).toUpperCase() === 'K') {
-            score = MATE + (8 - depth);  // 吃将: 立即获胜
+            score = MATE + (8 - depth);
           } else {
             score = -negamax(map, -my, depth - 1, -beta, -alpha, 1);
           }
           hashUnapply(mv, captured);
           R.undoMove(map, mv, captured);
-
-          // 菜鸟档: 与当前最优分差 ≤ 40 分时随机替换, 制造不稳定性
           if (randomize && score >= bestScore - 40 && Math.random() < 0.4) {
             bestMove = mv; bestScore = score;
           } else if (score > bestScore) {
@@ -534,15 +507,67 @@
           }
           if (score > alpha) alpha = score;
         }
+      } catch (e) {
+        if (e.message !== 'nodes-exceeded' && e.message !== 'budget-exceeded' && e.message !== 'time-exceeded') throw e;
       }
-    } catch (e) {
-      if (e.message !== 'nodes-exceeded' && e.message !== 'budget-exceeded') throw e;
-      // 节点超限/预算超: 用当前搜索到的着法兜底 (即使未完成)
-      if (!bestMove && moves.length) { bestMove = moves[0]; bestScore = 0; }
+      if (!bestMove) { bestMove = moves[0]; bestScore = 0; }
+      bestMove.score = bestScore;
+      return bestMove;
     }
 
-    if (!bestMove) return null;
+    // 目标深度: 高手 10 层; 中级 7 层; 菜鸟 5 层
+    const targetDepth = depth >= 5 ? 10 : (depth >= 3 ? 7 : 5);
+    const timeBudget = depth >= 5 ? TIME_LIMIT_MS : (depth >= 3 ? 6000 : 3000);
+
+    const start = Date.now();
+    let bestMove = null;
+    let bestScore = 0;
+    // 吃将立即返回 (终局走法无需搜索)
+    const kill = moves.find(m => map[m.to.r][m.to.c] && R.pieceType(map[m.to.r][m.to.c]).toUpperCase() === 'K');
+    if (kill) { kill.score = MATE; return kill; }
+
+    // 逐层加深: 深 3 → 4 → 5 ... → targetDepth
+    deadline = start + timeBudget;   // 全局截止: 时间到立即停 (返回已完成的最高层)
+    for (let d = 3; d <= targetDepth; d++) {
+      nodeCount = 0;
+      searchDepth = d;
+      clearHistory();
+      TT.clear();   // 每层清表 (层间评估口径一致)
+      sortMoves(moves, map);
+      curHash = boardHash(map);
+      nodeBudget = 10000000;   // 单层 1000 万节点 (时间截止才是真预算)
+
+      try {
+        const guess = bestMove ? bestScore : evaluate(map) * (my > 0 ? 1 : -1);
+        const mv = mtdf(map, my, d, guess);
+        if (mv) { bestMove = mv; bestScore = mv.score !== undefined ? mv.score : bestScore; }
+      } catch (e) {
+        if (e.message !== 'nodes-exceeded' && e.message !== 'budget-exceeded' && e.message !== 'time-exceeded') throw e;
+        break;  // 该层超时/超限 → 用上一层结果
+      }
+    }
+
+    // 最终校验: bestMove 必须合法 (走完不被将军/不造成对脸) — 防伪走法泄漏
+    if (bestMove) {
+      const cap = R.makeMove(map, bestMove);
+      const ok = !R.inCheck(map, my) && !R.kingsFacing(map);
+      R.undoMove(map, bestMove, cap);
+      if (!ok) {
+        // 从不合法候选里挑一个合法走法 (moves 已按分数排序, 取第一个合法的)
+        const legalAlt = moves.find(m => {
+          const c2 = R.makeMove(map, m);
+          const ok2 = !R.inCheck(map, my) && !R.kingsFacing(map);
+          R.undoMove(map, m, c2);
+          return ok2;
+        });
+        bestMove = legalAlt || moves[0];
+        bestScore = 0;
+      }
+    }
+    if (!bestMove) { bestMove = moves[0]; bestScore = 0; }
     bestMove.score = bestScore;
+    // 附上实际达到的深度 (调试/显示用)
+    bestMove._depth = searchDepth;
     return bestMove;
   }
 
