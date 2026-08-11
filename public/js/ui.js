@@ -143,12 +143,15 @@
 
   function render() {
     // 棋子: 逻辑行 r → 屏幕行 viewR(r); 仅当棋子变化时更新 (不重建 → 不抖动)
+    // 关键: 复用判断必须同时比较 字符 + 颜色 (charOf 红黑同字, 只看字会漏掉吃子后颜色反转)
     for (let r = 0; r < 10; r++) {
       const vr = viewR(r);
       for (let c = 0; c < 9; c++) {
         const cell = cells[vr][c];
         const piece = st.map[r][c];
-        if (cell.pieceEl && cell.pieceEl.querySelector('.glyph')?.textContent === R.charOf(piece) && !!piece) continue;
+        const sameGlyph = cell.pieceEl && cell.pieceEl.querySelector('.glyph')?.textContent === R.charOf(piece) && !!piece;
+        const sameColor = cell.pieceEl && cell.pieceEl.classList.contains(piece && R.isRed(piece) ? 'red' : 'black') && !!piece;
+        if (sameGlyph && sameColor) continue;
         if (cell.pieceEl) { cell.pieceEl.remove(); cell.pieceEl = null; }
         if (piece) setPiece(vr, c, piece);
       }
@@ -281,8 +284,11 @@
     if (!room) { location.href = '/'; return; }
     myRoom = room;
     try {
-      const data = await api('join', { room, name });
+      // 复用上次的 sid (退出重进 → 服务端 60s 内恢复原玩家, 续对局不重置)
+      const savedSid = localStorage.getItem('xq-sid:' + room);
+      const data = await api('join', { room, name, ...(savedSid ? { sid: savedSid } : {}) });
       mySid = data.sid; playerSide = data.side;
+      localStorage.setItem('xq-sid:' + room, data.sid);
       // 红方翻转: 己方红子在下方 (数据驱动, 格子 data-r 定位已按屏幕位置)
       flipped = playerSide === 1;
       st = G.create();

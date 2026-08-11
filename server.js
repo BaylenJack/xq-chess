@@ -78,6 +78,7 @@ function roomState(room) {
     const rs = {
       name: room,
       players: new Map(),   // sid -> {sid, name, side, stream}
+      leaveTimes: new Map(), // sid -> ts (退出后 60s 内可凭 sid 恢复续局)
       map: rules.initMap(),
       turn: RED,
       history: [],
@@ -246,6 +247,27 @@ async function handleRequest(req, res) {
           }
         }
       }
+      // 退出后 60s 内重进: 凭 sid 恢复原玩家 (续对局, 不重置)
+      const reqSid = String(q.sid || body.sid || '');
+      const leaveTs = reqSid && rs.leaveTimes.get(reqSid);
+      if (leaveTs && Date.now() - leaveTs < 60000) {
+        rs.leaveTimes.delete(reqSid);
+        const restored = {
+          sid: reqSid,
+          name: rs.players.has(reqSid) ? rs.players.get(reqSid).name : name,
+          side: rs.players.has(reqSid) ? rs.players.get(reqSid).side : (RED),
+          stream: null,
+        };
+        // 若该 sid 已存在 (极端并发), 直接返回
+        if (rs.players.has(reqSid)) {
+          json(res, 200, { sid: reqSid, side: rs.players.get(reqSid).side, room, name: rs.players.get(reqSid).name, players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })) });
+          return;
+        }
+        rs.players.set(reqSid, restored);
+        scheduleRoomCleanup(rs);
+        json(res, 200, { sid: reqSid, side: restored.side, room, name: restored.name, players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })) });
+        return;
+      }
       if (isFull(rs)) return json(res, 409, { error: '房间已满' });
       // 按已占颜色分配: 红方空缺 → 红, 否则 → 黑 (防止重进撞角色死局)
       const hasRed = [...rs.players.values()].some(p => p.side === RED);
@@ -253,10 +275,13 @@ async function handleRequest(req, res) {
       rs.players.set(sid, { sid, name, side, stream: null });
       scheduleRoomCleanup(rs);  // 加入后重排清理 (2 人 → 不再清理)
       json(res, 200, { sid, side, room, name, players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })) });
-      // 第二人加入 → 开局, 通知两人 (用 setImmediate 等两人的 stream 连接好, 避免丢消息)
-      if (rs.players.size === 2) {
+      // 第二人加入 → 仅新局才开局 (history 空 且 status=playing 且无人走过); 已有对局则续局不重置
+      if (rs.players.size === 2 && rs.history.length === 0 && rs.status === PLAYING && rs.lastMove === null) {
         rs.map = rules.initMap(); rs.turn = RED; rs.history = []; rs.status = PLAYING; rs.check = false; rs.lastMove = null;
         resetClock(rs);
+        setImmediate(() => broadcast(rs, 'start', { players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })) }));
+      } else if (rs.players.size === 2 && rs.history.length > 0) {
+        // 续局: 不重置, 通知两人恢复
         setImmediate(() => broadcast(rs, 'start', { players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })) }));
       }
       return;
@@ -287,6 +312,8 @@ async function handleRequest(req, res) {
         if (rs.players.get(sid) && rs.players.get(sid).stream === res) {
           rs.players.delete(sid);
           me.stream = null;
+          // 记录离开时间: 60s 内凭 sid 可恢复续局
+          rs.leaveTimes.set(sid, Date.now());
           // 只剩一人 → 通知剩余玩家等待
           if (rs.players.size === 1) {
             const rest = [...rs.players.values()][0];
