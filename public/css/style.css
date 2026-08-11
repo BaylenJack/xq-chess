@@ -721,7 +721,7 @@ html, body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 9' preserveAspectRatio='none' width='100%25' height='100%25'><g stroke='%233d2611' stroke-width='0.025' fill='none' shape-rendering='crispEdges'><!-- 上九宫: (3,0)-(5,2) 对角 --><line x1='3' y1='0' x2='5' y2='2'/><line x1='5' y1='0' x2='3' y2='2'/><!-- 下九宫: (3,7)-(5,9) 对角 --><line x1='3' y1='7' x2='5' y2='9'/><line x1='5' y1='7' x2='3' y2='9'/></g></svg>");
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 9' preserveAspectRatio='none' width='100%25' height='100%25'><g stroke='%233d2611' stroke-width='1.5' vector-effect='non-scaling-stroke' fill='none' shape-rendering='geometricPrecision'><line x1='3' y1='0' x2='5' y2='2'/><line x1='5' y1='0' x2='3' y2='2'/><line x1='3' y1='7' x2='5' y2='9'/><line x1='5' y1='7' x2='3' y2='9'/></g></svg>");
   background-size: 100% 100%;
 }
 

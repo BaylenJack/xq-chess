@@ -1,57 +1,60 @@
 /*!
- * xq-chess 倒计时 (简化版)
- * 一个按钮 + 单个倒计时: 点按钮弹出倒计时, 对方走完子自动重置, 轮流使用。
- * ≤10s 红色闪烁; 到 0 上报 /api/timeout。
+ * xq-chess 倒计时 (服务端权威版)
+ * 不再本地计时: 只渲染 server 广播的 clock.deadline (毫秒时间戳)。
+ * 两方收到同一 deadline → 显示完全同步; 超时上报 /api/timeout (server 也自判)。
  */
 (function (root) {
   'use strict';
 
   const DEFAULT_SECONDS = 60;
-  const TICK_MS = 100;
-  let cur = DEFAULT_SECONDS;
-  let iv = null;
+  let deadline = 0;        // 服务端权威 deadline (ms 时间戳)
+  let on = false;
   let reported = false;
-  let running = false;
+  let rafId = null;
   let onExpireCb = null;
 
   function getEl() { return document.getElementById('clock-main'); }
+
+  // 渲染剩余秒数 (ceil, 与旧版一致)
   function render() {
     const el = getEl();
-    if (el) {
-      el.textContent = String(Math.ceil(cur));
-      el.classList.toggle('danger', running && cur <= 10);
-    }
+    if (!el) return;
+    const remain = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    el.textContent = String(remain);
+    el.classList.toggle('danger', on && remain <= 10);
   }
 
-  function tick() {
-    if (cur <= 0) {
-      if (!reported) {
-        reported = true;
-        if (onExpireCb) onExpireCb();
+  // 动画帧循环: 只渲染, 不做逻辑 (权威在 server)
+  function frame() {
+    const remain = deadline - Date.now();
+    if (on) {
+      if (remain <= 0) {
+        render();
+        if (!reported) {
+          reported = true;
+          if (onExpireCb) onExpireCb();
+        }
+        stop();
+        return;
       }
-      stop();
-      return;
+      render();
+      rafId = requestAnimationFrame(frame);
     }
-    cur = Math.max(0, +(cur - TICK_MS / 1000).toFixed(2));
-    render();
   }
 
-  function start() {
-    if (iv) return;
-    render();
-    iv = setInterval(tick, TICK_MS);
-    running = true;
-  }
-  function stop() {
-    if (iv) { clearInterval(iv); iv = null; }
-    running = false;
-  }
-  // 对方走子 → 重置
-  function reset() {
-    cur = DEFAULT_SECONDS;
+  // 从 server 广播同步 deadline
+  function sync(deadlineMs, isOn) {
+    deadline = deadlineMs || 0;
+    on = !!isOn;
     reported = false;
     render();
-    start();
+    if (on && !rafId) rafId = requestAnimationFrame(frame);
+  }
+  // 重置 (server 已重置, 客户端只显示新 deadline)
+  function reset() { sync(deadline, on); }
+  function stop() {
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    on = false;
   }
   function disable() {
     stop();
@@ -61,10 +64,10 @@
 
   const timer = {
     DEFAULT_SECONDS,
-    start, stop, reset, disable,
+    sync, reset, stop, disable,
     onExpire(fn) { onExpireCb = fn; },
-    get cur() { return cur; },
-    get running() { return running; },
+    get deadline() { return deadline; },
+    get running() { return on; },
   };
 
   root.XQ = root.XQ || {};

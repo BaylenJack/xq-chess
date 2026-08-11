@@ -21,6 +21,7 @@ const PORT = process.env.PORT || 8280;
 const { rules } = require(path.join(PUBLIC, 'js', 'rules.js'));
 const RED = 1, BLACK = -1;
 const PLAYING = 'playing', RED_WIN = 'red_win', BLACK_WIN = 'black_win';
+const CLOCK_SECONDS = Number(process.env.CLOCK_SECONDS) || 60;   // 单方步时 (秒), 走子后重置 (测试可缩短)
 
 // ---- 密钥 ----
 function loadKey() {
@@ -77,6 +78,7 @@ function roomState(room) {
       status: PLAYING,
       check: false,
       lastMove: null,
+      clock: { deadline: 0, on: false },   // 服务端权威倒计时: 走子后重置
       emptyTimer: null,
       soloTimer: null,
     };
@@ -96,6 +98,24 @@ function broadcast(rs, event, data) {
   }
 }
 
+// 倒计时: 重置 (走子/开局/悔棋/重开后调用); 附带服务端自判超时 (客户端断线也能判负)
+function resetClock(rs) {
+  if (rs.clockTimer) { clearTimeout(rs.clockTimer); rs.clockTimer = null; }
+  const deadline = Date.now() + CLOCK_SECONDS * 1000;
+  rs.clock = { deadline, on: true };
+  rs.clockTimer = setTimeout(() => {
+    if (rs.status !== PLAYING || !rs.clock.on) return;
+    if (Date.now() < rs.clock.deadline) return;
+    // 轮到谁谁超时
+    const loser = rs.turn;
+    const winner = -loser;
+    rs.status = winner === RED ? RED_WIN : BLACK_WIN;
+    rs.clock.on = false;
+    const winnerSid = [...rs.players.values()].find(p => p.side === winner)?.sid || null;
+    broadcast(rs, 'state', view(rs, 0, { winner: winnerSid, reason: 'timeout' }));
+  }, CLOCK_SECONDS * 1000 + 2000);   // +2s 缓冲, 让客户端上报优先 (双保险)
+}
+
 // 组装发给单个玩家的视图 (隐藏对方无关信息)
 function view(rs, forSide, extra) {
   return {
@@ -108,6 +128,7 @@ function view(rs, forSide, extra) {
     lastMove: rs.lastMove,
     you: forSide,
     players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })),
+    clock: { deadline: rs.clock.deadline, on: rs.clock.on },   // 权威倒计时
     ...(extra || {}),
   };
 }
@@ -225,6 +246,7 @@ async function handleRequest(req, res) {
       // 第二人加入 → 开局, 通知两人 (用 setImmediate 等两人的 stream 连接好, 避免丢消息)
       if (rs.players.size === 2) {
         rs.map = rules.initMap(); rs.turn = RED; rs.history = []; rs.status = PLAYING; rs.check = false; rs.lastMove = null;
+        resetClock(rs);
         setImmediate(() => broadcast(rs, 'start', { players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })) }));
       }
       return;
@@ -272,6 +294,7 @@ async function handleRequest(req, res) {
       if (!mv || !mv.fr || !mv.to) return json(res, 400, { error: '参数错误' });
       const res2 = tryMove(rs, me.side, mv);
       if (!res2.ok) return json(res, 400, { error: res2.reason });
+      resetClock(rs);
       broadcast(rs, 'state', view(rs, 0));
       return json(res, 200, { ok: true });
     }
@@ -289,6 +312,7 @@ async function handleRequest(req, res) {
       // 悔棋后轮到走棋方: 历史偶数手 → 红方, 奇数手 → 黑方
       rs.turn = rs.history.length % 2 === 0 ? RED : BLACK;
       rs.check = rules.inCheck(rs.map, rs.turn);
+      resetClock(rs);
       broadcast(rs, 'state', view(rs, 0));
       return json(res, 200, { ok: true });
     }
@@ -296,6 +320,7 @@ async function handleRequest(req, res) {
     // 重开
     if (url.pathname === '/api/restart' && req.method === 'POST') {
       rs.map = rules.initMap(); rs.turn = RED; rs.history = []; rs.status = PLAYING; rs.check = false; rs.lastMove = null;
+      resetClock(rs);
       broadcast(rs, 'state', view(rs, 0));
       return json(res, 200, { ok: true });
     }
@@ -304,10 +329,13 @@ async function handleRequest(req, res) {
     if (url.pathname === '/api/timeout' && req.method === 'POST') {
       if (rs.status !== PLAYING) return json(res, 400, { error: '对局已结束' });
       if (rs.turn !== me.side) return json(res, 400, { error: '还没轮到你' });
+      // 服务端权威校验: 必须真的超时 (防客户端提前上报)
+      if (!rs.clock.on || Date.now() < rs.clock.deadline) return json(res, 400, { error: '时间未到' });
       // 判负: 对方胜
       const winner = -me.side;
       rs.status = winner === RED ? RED_WIN : BLACK_WIN;
       rs.check = false;
+      rs.clock.on = false;
       const winnerSid = [...rs.players.values()].find(p => p.side === winner)?.sid || null;
       broadcast(rs, 'state', view(rs, 0, { winner: winnerSid, reason: 'timeout' }));
       return json(res, 200, { ok: true });

@@ -94,16 +94,20 @@
     wrap.appendChild(boardEl);
     // 关键! 显式计算并设置 --cell (像素值), 避免嵌套 calc 失效
     const boardW = boardEl.getBoundingClientRect().width;
-    const cellPx = Math.max(36, Math.floor(boardW / 9));
+    const cellPx = Math.max(30, Math.floor(boardW / 9));
     boardEl.style.setProperty('--cell', cellPx + 'px');
-    // 棋盘大小变化时重设
+    // 棋盘大小变化时重设 (ResizeObserver + resize 兜底, 覆盖安卓 WebView 不触发 RO 的情况)
+    const recomputeCell = () => {
+      const w = boardEl.getBoundingClientRect().width;
+      const c = Math.max(30, Math.floor(w / 9));
+      boardEl.style.setProperty('--cell', c + 'px');
+    };
     if (typeof ResizeObserver !== 'undefined') {
-      new ResizeObserver(() => {
-        const w = boardEl.getBoundingClientRect().width;
-        const c = Math.max(36, Math.floor(w / 9));
-        boardEl.style.setProperty('--cell', c + 'px');
-      }).observe(boardEl);
+      new ResizeObserver(recomputeCell).observe(boardEl);
     }
+    window.addEventListener('resize', recomputeCell);
+    // 首帧校准 (等布局稳定后再算一次)
+    requestAnimationFrame(() => requestAnimationFrame(recomputeCell));
   }
 
   function setPiece(r, c, piece) {
@@ -276,7 +280,7 @@
       render();
       connectStream();
       if (data.players.length >= 2) playSound('join');
-      XQ.timer.reset();
+      // 倒计时由 SSE 广播同步 (服务端权威), 此处不重置
     } catch (e) {
       // 加入失败 (房间满等): 弹提示并回到进入页
       showModal(e.message || '加入房间失败');
@@ -309,6 +313,8 @@
       st.history = s.history;
       st.lastMove = s.lastMove;
       st.players = s.players;
+      // 倒计时: 服务端权威 (deadline 广播), 两方同步
+      if (s.clock) XQ.timer.sync(s.clock.deadline, s.clock.on);
       if (last) playSound(last.captured ? 'capture' : 'move');
       if (s.check) playSound('check');
       if (s.status !== 'playing') {
@@ -321,8 +327,7 @@
         }
         XQ.timer.disable();
       } else if (last) {
-        // 对方走子 → 倒计时重置 (轮流制)
-        XQ.timer.reset();
+        // 对方走子 → server 已重置 deadline, 上面的 sync 已同步
       }
       selected = null; legalNow = []; illegalNow = []; clearHint();
       render();
@@ -337,7 +342,7 @@
       st.players = s.players;
       showModal('对局开始');
       playSound('join');
-      XQ.timer.reset();
+      // 倒计时随 state 广播同步 (start 事件无 clock, 由紧随的 state 处理)
       render();
     });
     es.addEventListener('peer_left', ev => {
