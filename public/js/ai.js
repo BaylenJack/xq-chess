@@ -12,7 +12,7 @@
   const MATE = 8888;          // 将死分值
   const MAX_NODES = 3000000;  // 安全上限, 防极端局面卡死
   // 深度 → 节点预算 (满血: 深 4 完整搜索, 仅防极端局面失控)
-  const DEPTH_BUDGET = { 2: 100000, 3: 400000, 4: 1200000 };
+  const DEPTH_BUDGET = { 2: 100000, 3: 1000000, 4: 10000000 };
 
   // ---- 位置估值表 (红方视角, row 0=红底线 → row 9=黑底线) ----
   const PST = {
@@ -104,14 +104,32 @@
 
   // 子力价值 (评估用, 吃子排序也参考)
   const PIECE_VALUE = { R: 600, H: 270, C: 285, E: 120, A: 120, P: 30, K: 8888 };
+  // 残局价值调整 (借鉴 cchess-zero 价值曲线 + ChineseChess EndGame):
+  // 残局: 马/兵价值升 (兵残局值钱), 炮/车价值略降
+  const ENDGAME_VALUE = { R: 550, H: 300, C: 250, E: 100, A: 100, P: 120, K: 8888 };
+
+  // 残局判定: 双方除将帅外子力总和 < 阈值
+  function isEndgame(map) {
+    let total = 0;
+    for (let r = 0; r < 10; r++) {
+      for (let c = 0; c < 9; c++) {
+        const p = map[r][c];
+        if (!p || p[0].toUpperCase() === 'K') continue;
+        total += PIECE_VALUE[p[0].toUpperCase()];
+      }
+    }
+    return total < 1500;   // 约剩 2车1炮 以下
+  }
 
   // 红方位置表取值; 黑方行镜像 (9 - r)
   function pstValue(type, r, c, my) {
     return PST[type][my === 1 ? r : 9 - r][c];
   }
 
-  // 静态评估: 红为正, 黑为负
+  // 静态评估: 红为正, 黑为负; 中局/残局分阶段 (借鉴 ChineseChess 分阶段评估)
   function evaluate(map) {
+    const endgame = isEndgame(map);
+    const V = endgame ? ENDGAME_VALUE : PIECE_VALUE;
     let val = 0;
     for (let r = 0; r < 10; r++) {
       for (let c = 0; c < 9; c++) {
@@ -124,7 +142,14 @@
           val += 8888 * my;  // 保持对称, 但正常局面将都在
           continue;
         }
-        val += my * (PIECE_VALUE[t] + pstValue(t, r, c, my));
+        // 兵/卒: 过河后位置价值已含在 PST; 残局兵额外加值 (借鉴 cchess-zero 残局兵曲线)
+        let base = V[t];
+        if (t === 'P' && endgame) {
+          // 残局兵: 越深入敌阵越值钱 (row 0-4 = 过河)
+          const row = my === 1 ? r : 9 - r;
+          base += (5 - Math.min(row, 4)) * 8;
+        }
+        val += my * (base + pstValue(t, r, c, my));
       }
     }
     return val;
@@ -144,42 +169,283 @@
   }
 
   let nodeCount = 0;
+  let searchDepth = 3;   // 当前搜索总深度 (深2禁用静态搜索, 防浅层贪吃长局)
   let nodeBudget = Infinity;   // 当前搜索的节点预算 (超限抛 budget-exceeded, 用已搜结果兜底)
+  const TYPE_IDX = { R: 0, H: 1, C: 2, E: 3, A: 4, P: 5, K: 6 };
 
-  // negamax alpha-beta: 返回分值; 根节点选最佳着法
-  function negamax(map, my, depth, alpha, beta) {
+  // ---- Zobrist 哈希 + 置换表 (Transposition Table, 借鉴 ChineseChess zobrist) ----
+  // 64 位 BigInt 哈希: 7 类型 × 2 色 × 90 格
+  let ZOB = null;      // [type(7)][color(2)][cell(90)] -> BigInt
+  let HASH_MASK = (1n << 63n) - 1n;
+  function initZobrist() {
+    if (ZOB) return;
+    ZOB = [];
+    let seed = 0x9e3779b9;
+    const rnd = () => {
+      // xorshift32
+      seed ^= seed << 13; seed |= 0; seed >>>= 0;
+      seed ^= seed >> 17;
+      seed ^= seed << 5; seed >>>= 0;
+      return BigInt(seed);
+    };
+    for (let t = 0; t < 7; t++) {
+      ZOB[t] = [];
+      for (let c = 0; c < 2; c++) {
+        ZOB[t][c] = [];
+        for (let cell = 0; cell < 90; cell++) {
+          ZOB[t][c][cell] = (rnd() << 32n) ^ rnd();
+        }
+      }
+    }
+  }
+  const TT = new Map();   // hash -> { score, depth, flag: 'exact'|'lower'|'upper', move }
+  const TT_EXACT = 0, TT_LOWER = 1, TT_UPPER = 2;
+  let curHash = 0n;
+  // 棋盘 → 哈希 (仅根节点全量, 搜索内增量)
+  function boardHash(map) {
+    let h = 0n;
+    for (let r = 0; r < 10; r++) {
+      for (let c = 0; c < 9; c++) {
+        const p = map[r][c];
+        if (!p) continue;
+        const t = TYPE_IDX[R.pieceType(p).toUpperCase()];
+        const color = R.isRed(p) ? 0 : 1;
+        h ^= ZOB[t][color][r * 9 + c];
+      }
+    }
+    return h;
+  }
+  function hashApply(mv, captured) {
+    const t = TYPE_IDX[R.pieceType(mv.piece).toUpperCase()];
+    const color = R.isRed(mv.piece) ? 0 : 1;
+    curHash ^= ZOB[t][color][mv.fr.r * 9 + mv.fr.c];
+    curHash ^= ZOB[t][color][mv.to.r * 9 + mv.to.c];
+    if (captured) {
+      const ct = TYPE_IDX[R.pieceType(captured).toUpperCase()];
+      const cc = R.isRed(captured) ? 0 : 1;
+      curHash ^= ZOB[ct][cc][mv.to.r * 9 + mv.to.c];
+    }
+  }
+  function hashUnapply(mv, captured) {
+    const t = TYPE_IDX[R.pieceType(mv.piece).toUpperCase()];
+    const color = R.isRed(mv.piece) ? 0 : 1;
+    curHash ^= ZOB[t][color][mv.to.r * 9 + mv.to.c];
+    curHash ^= ZOB[t][color][mv.fr.r * 9 + mv.fr.c];
+    if (captured) {
+      const ct = TYPE_IDX[R.pieceType(captured).toUpperCase()];
+      const cc = R.isRed(captured) ? 0 : 1;
+      curHash ^= ZOB[ct][cc][mv.to.r * 9 + mv.to.c];
+    }
+  }
+  function ttGet(hash, depth) {
+    const e = TT.get(hash);
+    if (!e || e.depth < depth) return null;
+    return e;
+  }
+  function ttStore(hash, depth, score, flag, mv) {
+    const e = TT.get(hash);
+    if (e && e.depth >= depth) return;  // 已有更深条目
+    TT.set(hash, { score, depth, flag, mv: mv || null });
+    // 防无限增长: 超 20 万条清空 (对局搜索间隙清理)
+    if (TT.size > 200000) TT.clear();
+  }
+
+  // ---- 历史启发表: [兵种][目标格] 累积得分 (借鉴 CHistoryHeuritic: 好着法加 2<<depth, 坏着法减) ----
+  // 生命周期: 每次 getBestMove 清空, 防止跨对局污染
+  let HISTORY = null;
+  function clearHistory() {
+    HISTORY = new Array(8).fill(0).map(() => new Array(90).fill(0));
+  }
+  function historyScore(mv) {
+    if (!HISTORY) return 0;
+    return HISTORY[TYPE_IDX[R.pieceType(mv.piece).toUpperCase()]][mv.to.r * 9 + mv.to.c];
+  }
+  function historyAdd(mv, depth) {
+    if (!HISTORY) return;
+    HISTORY[TYPE_IDX[R.pieceType(mv.piece).toUpperCase()]][mv.to.r * 9 + mv.to.c] += (1 << Math.min(depth, 8));
+  }
+
+  // 着法排序: 吃子 (MVV-LVA) >> 历史启发 (借鉴 CHistoryHeuritic 排序)
+  function sortMoves(moves, map) {
+    moves.sort((a, b) => {
+      const sa = moveScore(b, map), sb = moveScore(a, map);
+      // 吃子优先 (moveScore 吃子返回大值), 非吃子按历史
+      if (sa !== sb) return sa - sb;
+      return historyScore(b) - historyScore(a);
+    });
+  }
+
+  // 静态搜索 (Quiescence, 借鉴 ChessQuiescMove): 叶子节点只搜吃子, 消除水平线效应
+  function quiesce(map, my, alpha, beta) {
     nodeCount++;
     if (nodeCount > nodeBudget) throw new Error('budget-exceeded');
     if (nodeCount > MAX_NODES) throw new Error('nodes-exceeded');
 
+    const stand = my * evaluate(map);
+    if (stand >= beta) return stand;   // 超出上界, 剪枝
+    if (stand > alpha) alpha = stand;
+
+    // 只生成"吃子"走法 (捕获走法): 伪走法 + 走完不被将军过滤 (保持规则正确)
+    const pseudo = R.genPseudoMoves(map, my);
+    const captures = [];
+    for (const mv of pseudo) {
+      if (!map[mv.to.r][mv.to.c]) continue;
+      const captured = R.makeMove(map, mv);
+      const ok = !R.inCheck(map, my) && !R.kingsFacing(map);
+      R.undoMove(map, mv, captured);
+      if (ok) captures.push(mv);
+    }
+    if (captures.length === 0) return stand;
+
+    // 排序: 吃子价值大的优先 (MVV-LVA)
+    captures.sort((a, b) => moveScore(b, map) - moveScore(a, map));
+
+    let best = stand;
+    for (const mv of captures) {
+      const captured = R.makeMove(map, mv);
+      if (captured && R.pieceType(captured).toUpperCase() === 'K') {
+        R.undoMove(map, mv, captured);
+        return MATE - 2000;  // 吃将直接取胜
+      }
+      const val = -quiesce(map, -my, -beta, -alpha);
+      R.undoMove(map, mv, captured);
+      if (val > best) best = val;
+      if (val > alpha) alpha = val;
+      if (alpha >= beta) break;
+    }
+    return best;
+  }
+
+  // negamax alpha-beta + 置换表 + 历史启发 + 静态搜索: 返回分值; 根节点选最佳着法
+  function negamax(map, my, depth, alpha, beta, ply) {
+    nodeCount++;
+    if (nodeCount > nodeBudget) throw new Error('budget-exceeded');
+    if (nodeCount > MAX_NODES) throw new Error('nodes-exceeded');
+
+    // 置换表查询 (借鉴 ChineseChess TranspositionTable)
+    const origHash = curHash;
+    const tt = ttGet(origHash, depth);
+    if (tt) {
+      if (tt.flag === TT_EXACT) return tt.score;
+      if (tt.flag === TT_LOWER && tt.score >= beta) return tt.score;
+      if (tt.flag === TT_UPPER && tt.score <= alpha) return tt.score;
+    }
+    // 置换表着法优先搜索
+    let ttMove = tt && tt.mv;
+
     if (depth === 0) {
-      return my * evaluate(map);
+      // 叶子 → 静态搜索 (只搜吃子, 消除水平线效应)
+      // 注意: 深 2 不启用 (浅层贪吃会导致对局拖长), 深 ≥3 才用
+      const s = (searchDepth < 3) ? my * evaluate(map) : quiesce(map, my, alpha, beta);
+      ttStore(origHash, depth, s, TT_EXACT, null);
+      return s;
     }
 
     const moves = R.legalMoves(map, my);
     if (moves.length === 0) {
       // 无合法着法: 被将死则对方胜 (MATE - ply), 困毙也判负
-      return -(MATE - 2000) - (8 - depth);  // 越早杀越大; 困毙同判负
+      const s = -(MATE - 2000) - (8 - depth);  // 越早杀越大; 困毙同判负
+      ttStore(origHash, depth, s, TT_EXACT, null);
+      return s;
     }
 
-    // 排序: 吃子优先
-    moves.sort((a, b) => moveScore(b, map) - moveScore(a, map));
+    // 排序: 吃子优先 + 历史启发 + 置换表着法置顶
+    sortMoves(moves, map);
+    if (ttMove) {
+      const i = moves.findIndex(m => m.fr.r === ttMove.fr.r && m.fr.c === ttMove.fr.c && m.to.r === ttMove.to.r && m.to.c === ttMove.to.c);
+      if (i > 0) { moves.unshift(moves.splice(i, 1)[0]); }
+    }
 
     let best = -Infinity;
+    let bestMv = null;
+    let flag = TT_UPPER;
     for (const mv of moves) {
       const captured = R.makeMove(map, mv);
+      hashApply(mv, captured);
       // 吃将即胜
       if (captured && R.pieceType(captured).toUpperCase() === 'K') {
+        hashUnapply(mv, captured);
         R.undoMove(map, mv, captured);
+        ttStore(origHash, depth, MATE - 2000 + (8 - depth), TT_EXACT, mv);
         return MATE - 2000 + (8 - depth);  // 对方将被吃: 直接取胜
       }
-      const val = -negamax(map, -my, depth - 1, -beta, -alpha);
+      const val = -negamax(map, -my, depth - 1, -beta, -alpha, ply + 1);
+      hashUnapply(mv, captured);
       R.undoMove(map, mv, captured);
-      if (val > best) best = val;
-      if (val > alpha) alpha = val;
-      if (alpha >= beta) break;  // 剪枝
+      if (val > best) { best = val; bestMv = mv; }
+      if (val > alpha) {
+        alpha = val;
+        flag = TT_EXACT;
+      }
+      if (alpha >= beta) {
+        // 剪枝: 下界
+        flag = TT_LOWER;
+        historyAdd(mv, depth);
+        break;
+      }
     }
+    // 记录最佳着法 (历史 + 置换表)
+    if (alpha < beta && bestMv) historyAdd(bestMv, depth);
+    ttStore(origHash, depth, best, flag, bestMv);
     return best;
+  }
+
+  // MTD(f) 搜索 (借鉴 ChineseChess AICoreHandler): 零窗口反复搜索, 收敛到真值
+  // 比标准 alpha-beta 窗口窄, 配合置换表提升剪枝率
+  function mtdf(map, my, depth, guess) {
+    let lower = -Infinity;
+    let upper = Infinity;
+    let g = guess;
+    let bestMv = null;
+    const moves0 = R.legalMoves(map, my);
+    let iterations = 0;
+    while (lower < upper - 1 && iterations < 64) {   // 迭代上限 64 (防置换表死循环)
+      iterations++;
+      const beta = (g === -Infinity || g === Infinity) ? (g === -Infinity ? -Infinity + 1 : Infinity - 1) : g;
+      const res = pvsRoot(map, my, depth, beta - 1, beta, moves0);
+      g = res.score;
+      if (res.move) bestMv = res.move;
+      if (g < beta) upper = g;
+      else lower = g;
+      if (nodeCount > nodeBudget) break;  // 预算保护
+    }
+    if (bestMv) bestMv.score = (lower > -Infinity && lower < Infinity) ? lower : g;
+    return bestMv;
+  }
+
+  // 根节点: 对每个走法搜索, 返回最佳着法 + 分值 (供 MTD(f) 迭代)
+  function pvsRoot(map, my, depth, alpha, beta, moves) {
+    let best = -Infinity;
+    let bestMv = null;
+    let first = true;
+    for (const mv of moves) {
+      if (nodeCount > nodeBudget) throw new Error('budget-exceeded');  // 预算保护
+      const captured = R.makeMove(map, mv);
+      hashApply(mv, captured);
+      let score;
+      if (captured && R.pieceType(captured).toUpperCase() === 'K') {
+        score = MATE + (8 - depth);
+        hashUnapply(mv, captured);
+        R.undoMove(map, mv, captured);
+        return { score, move: mv };
+      } else {
+        // 根节点用全窗口 (PVS: 首走法全窗口, 其余零窗口)
+        if (first) {
+          score = -negamax(map, -my, depth - 1, -beta, -alpha, 1);
+          first = false;
+        } else {
+          score = -negamax(map, -my, depth - 1, -alpha - 1, -alpha, 1);
+          if (score > alpha && score < beta) {
+            score = -negamax(map, -my, depth - 1, -beta, -alpha, 1);
+          }
+        }
+      }
+      hashUnapply(mv, captured);
+      R.undoMove(map, mv, captured);
+      if (score > best) { best = score; bestMv = mv; }
+      if (score > alpha) alpha = score;
+    }
+    return { score: best, move: bestMv };
   }
 
   /**
@@ -195,38 +461,54 @@
     if (moves.length === 0) return null;
 
     nodeCount = 0;
-    moves.sort((a, b) => moveScore(b, map) - moveScore(a, map));
-
-    let alpha = -Infinity;
-    const beta = Infinity;
-    let bestMove = null;
-    let bestScore = -Infinity;
+    searchDepth = depth;
+    clearHistory();   // 历史启发仅本次搜索有效
+    initZobrist();    // 置换表哈希
+    TT.clear();
+    sortMoves(moves, map);   // 吃子优先 + 历史启发
+    curHash = boardHash(map);
 
     // 节点预算: 超限抛 budget-exceeded, 用已搜结果兜底 (保证响应速度)
     nodeBudget = DEPTH_BUDGET[depth] || MAX_NODES;
 
-    try {
-      for (const mv of moves) {
-        const captured = R.makeMove(map, mv);
-        let score;
-        if (captured && R.pieceType(captured).toUpperCase() === 'K') {
-          score = MATE + (8 - depth);  // 吃将: 立即获胜
-        } else {
-          score = -negamax(map, -my, depth - 1, -beta, -alpha);
-        }
-        R.undoMove(map, mv, captured);
+    let bestMove = null;
+    let bestScore = -Infinity;
 
-        // 菜鸟档: 与当前最优分差 ≤ 40 分时随机替换, 制造不稳定性
-        if (randomize && score >= bestScore - 40 && Math.random() < 0.4) {
-          bestMove = mv; bestScore = score;
-        } else if (score > bestScore) {
-          bestMove = mv; bestScore = score;
+    try {
+      // 深 ≥3: MTD(f) 迭代收敛 (借鉴 AICoreHandler); 深 2 保持简单 alpha-beta (菜鸟档随机化兼容)
+      if (depth >= 3) {
+        // 初始猜测: 静态评估
+        let guess = evaluate(map) * (my > 0 ? 1 : -1);
+        const mv = mtdf(map, my, depth, guess);
+        if (mv) { bestMove = mv; bestScore = mv.score !== undefined ? mv.score : 0; }
+      } else {
+        let alpha = -Infinity;
+        const beta = Infinity;
+        for (const mv of moves) {
+          const captured = R.makeMove(map, mv);
+          hashApply(mv, captured);
+          let score;
+          if (captured && R.pieceType(captured).toUpperCase() === 'K') {
+            score = MATE + (8 - depth);  // 吃将: 立即获胜
+          } else {
+            score = -negamax(map, -my, depth - 1, -beta, -alpha, 1);
+          }
+          hashUnapply(mv, captured);
+          R.undoMove(map, mv, captured);
+
+          // 菜鸟档: 与当前最优分差 ≤ 40 分时随机替换, 制造不稳定性
+          if (randomize && score >= bestScore - 40 && Math.random() < 0.4) {
+            bestMove = mv; bestScore = score;
+          } else if (score > bestScore) {
+            bestMove = mv; bestScore = score;
+          }
+          if (score > alpha) alpha = score;
         }
-        if (score > alpha) alpha = score;
       }
     } catch (e) {
       if (e.message !== 'nodes-exceeded' && e.message !== 'budget-exceeded') throw e;
       // 节点超限/预算超: 用当前搜索到的着法兜底 (即使未完成)
+      if (!bestMove && moves.length) { bestMove = moves[0]; bestScore = 0; }
     }
 
     if (!bestMove) return null;
