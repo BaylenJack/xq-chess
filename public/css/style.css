@@ -1083,7 +1083,16 @@ button, input, [role="button"], select, textarea {
     0 0 36px rgba(232, 182, 76, .35);
   pointer-events: none;
 }
-/* 新位置: 柔和底色 (与亮点区分, 弱化) */
+/* 新位置: 光圈环绕 (落子后持续显示, 直到下一步) + 柔和底色 */
+.cell.last-to::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 2px solid var(--gold-3);
+  pointer-events: none;
+  box-shadow: 0 0 10px rgba(232, 182, 76, .35);
+}
 .cell.last-to {
   background: radial-gradient(circle, rgba(232, 182, 76, .14) 30%, transparent 70%);
 }
