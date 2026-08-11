@@ -912,28 +912,29 @@ button, input, [role="button"], select, textarea {
 .piece.black { color: #1a1208; }
 
 /* 走子过渡动画: 原位置发光点 + 跳跃粒子 + 落子环绕 + 落地涟漪 */
+/* 旧位置亮点: 小而亮, 强光晕, 快速闪现 (走子后旧位置显著亮点) */
 .move-trail-dot {
   position: absolute;
-  width: calc(var(--cell) * 0.34);
-  height: calc(var(--cell) * 0.34);
+  width: calc(var(--cell) * 0.22);
+  height: calc(var(--cell) * 0.22);
   border-radius: 50%;
   background: radial-gradient(circle,
-    rgba(255, 250, 220, 1) 0%,
-    rgba(255, 235, 170, .9) 25%,
-    rgba(232, 182, 76, .45) 60%,
+    #fff 0%,
+    rgba(255, 250, 220, 1) 30%,
+    rgba(232, 182, 76, .7) 65%,
     transparent 100%);
   box-shadow:
-    0 0 10px rgba(255, 240, 190, .95),
-    0 0 24px rgba(232, 182, 76, .6),
-    0 0 40px rgba(232, 182, 76, .3);
+    0 0 12px rgba(255, 250, 220, 1),
+    0 0 28px rgba(232, 182, 76, .85),
+    0 0 48px rgba(232, 182, 76, .4);
   pointer-events: none;
   z-index: 4;
-  animation: trail-dot 1.3s var(--ease-out) forwards;
+  animation: trail-dot 0.9s var(--ease-out) forwards;
 }
 @keyframes trail-dot {
-  0% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
-  45% { transform: translate(-50%, -50%) scale(1.5); opacity: .85; }
-  100% { transform: translate(-50%, -50%) scale(0.15); opacity: 0; }
+  0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  30% { transform: translate(-50%, -50%) scale(1.6); opacity: .9; }
+  100% { transform: translate(-50%, -50%) scale(0.2); opacity: 0; }
 }
 /* 跳跃轨迹粒子 (抛物线) */
 .move-spark {

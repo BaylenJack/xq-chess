@@ -466,11 +466,11 @@
     const fromCell = cells[viewR(m.from.r)][m.from.c];
     const toCell = cells[viewR(m.to.r)][m.to.c];
 
-    // 原位置: 发光点 (明亮光晕 + 脉冲扩散, 与落子圈区分)
+    // 原位置: 显著亮点 (小而亮, 快速闪现, 与落子圈区分)
     if (fromCell && fromCell.el) {
       const dot = el('div', 'move-trail-dot');
       fromCell.el.appendChild(dot);
-      setTimeout(() => dot.remove(), 1300);
+      setTimeout(() => dot.remove(), 900);   // 匹配 CSS 0.9s 动画
     }
     // 跳跃轨迹: 弧线粒子带 (从原位置飘向落点)
     if (fromCell && toCell) {
