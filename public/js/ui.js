@@ -75,6 +75,24 @@
     boardEl.appendChild(el('div', 'wood-bg'));
     // 网格线
     boardEl.appendChild(el('div', 'grid-lines'));
+    // 九宫斜线: 内联 SVG (vector-effect 物理像素线宽, 任何 DPR 下与网格线一致)
+    const diagSVG = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    diagSVG.setAttribute('class', 'palace-diags');
+    diagSVG.setAttribute('viewBox', '0 0 8 9');
+    diagSVG.setAttribute('preserveAspectRatio', 'none');
+    const DIAG = 'http://www.w3.org/2000/svg';
+    const lines = [[3,0,5,2], [5,0,3,2], [3,7,5,9], [5,7,3,9]];
+    for (const [x1,y1,x2,y2] of lines) {
+      const ln = document.createElementNS(DIAG, 'line');
+      ln.setAttribute('x1', x1); ln.setAttribute('y1', y1);
+      ln.setAttribute('x2', x2); ln.setAttribute('y2', y2);
+      ln.setAttribute('stroke', '#3d2611');
+      ln.setAttribute('stroke-width', '1.5');
+      ln.setAttribute('vector-effect', 'non-scaling-stroke');
+      ln.setAttribute('shape-rendering', 'geometricPrecision');
+      diagSVG.appendChild(ln);
+    }
+    boardEl.appendChild(diagSVG);
     // 楚河汉界
     const riverBand = el('div', 'river-band');
     riverBand.innerHTML = '<span class="river">楚&nbsp;河&nbsp;汉&nbsp;界</span>';

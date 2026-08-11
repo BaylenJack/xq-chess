@@ -714,15 +714,21 @@ html, body {
   background:
     repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--cell) - 1.5px), var(--wood-deep) calc(var(--cell) - 1.5px), var(--wood-deep) var(--cell));
 }
-/* 九宫斜线: 上下各一个 2×2 田字格的对角 X
-   viewBox 8×9 = 8 格宽 × 9 格高 (与 grid-lines 层 1:1 对应, 无拉伸错位) */
+/* 九宫斜线: 由内联 <svg class="palace-diags"> 绘制 (vector-effect 物理像素线宽, 任何 DPR 下与网格线一致) */
 .board-wrap .grid-lines::before {
   content: '';
   position: absolute;
   inset: 0;
+  background: none;
+}
+.board-wrap .palace-diags {
+  position: absolute;
+  inset: calc(var(--cell) / 2);
   pointer-events: none;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 9' preserveAspectRatio='none' width='100%25' height='100%25'><g stroke='%233d2611' stroke-width='1.5' vector-effect='non-scaling-stroke' fill='none' shape-rendering='geometricPrecision'><line x1='3' y1='0' x2='5' y2='2'/><line x1='5' y1='0' x2='3' y2='2'/><line x1='3' y1='7' x2='5' y2='9'/><line x1='5' y1='7' x2='3' y2='9'/></g></svg>");
-  background-size: 100% 100%;
+  z-index: 1;
+  width: calc(var(--cell) * 8);
+  height: calc(var(--cell) * 9);
+  display: block;
 }
 
 /* 楚河汉界 (z 2, 覆盖 grid) */
