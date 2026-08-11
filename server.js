@@ -114,14 +114,33 @@ function serializePlayers(rs) {
   return [...rs.players.values()].map(p => ({ sid: p.sid, name: p.name, side: p.side }));
 }
 
-// 悔棋: 退 1 步 (悔自己走的那手); 还原 turn = 走出该步的人的颜色
-function executeUndo(rs) {
+// 悔棋: 退到"请求者"自己上一步 (请求者 = 悔自己刚走的那手)
+// 即: 从 history 尾部弹出对方的一步 + 自己的最后一步; 若只剩自己的 1 步则退 1 步
+function executeUndo(rs, requesterSide) {
   if (rs.history.length === 0) return;
-  const rec = rs.history.pop();
-  rules.undoMove(rs.map, rec.mv, rec.captured);
+  // 从尾部往前, 找到 requesterSide 走的那手, 退到它之前
+  // 标准: 悔棋 = 撤销"我的上一手"(以及其后的对方一手)
+  const mine = [];
+  let i = rs.history.length - 1;
+  // 先撤掉尾部对方的回应 (若有)
+  if (i >= 0 && rules.isRed(rs.history[i].mv.piece) !== (requesterSide === RED)) {
+    const rec = rs.history[i];
+    rules.undoMove(rs.map, rec.mv, rec.captured);
+    rs.history.pop();
+    i--;
+  }
+  // 再撤自己的上一手 (必须有)
+  if (i >= 0) {
+    const rec = rs.history[i];
+    if (rules.isRed(rec.mv.piece) === (requesterSide === RED)) {
+      rules.undoMove(rs.map, rec.mv, rec.captured);
+      rs.history.pop();
+    }
+  }
   rs.status = PLAYING; rs.check = false;
   rs.lastMove = rs.history.length ? rs.history[rs.history.length - 1] : null;
-  rs.turn = rules.isRed(rec.piece) ? RED : BLACK;
+  // 悔棋后轮到请求者走
+  rs.turn = requesterSide;
   rs.check = rules.inCheck(rs.map, rs.turn);
   resetClock(rs);
 }
@@ -269,6 +288,22 @@ async function handleRequest(req, res) {
       }
       // 退出后 60s 内重进: 凭 sid 恢复原玩家 (续对局, 不重置)
       const reqSid = String(q.sid || body.sid || '');
+      // 兜底: 若 sid 已在 players 但 stream 已断开 (断网/杀进程无 close 事件) → 直接接管
+      if (reqSid && rs.players.has(reqSid)) {
+        const existing = rs.players.get(reqSid);
+        if (!existing.stream || existing.stream.destroyed || existing.stream.writableEnded) {
+          console.log(`[join] 接管断连玩家 ${reqSid}`);
+          rs.players.delete(reqSid);
+          rs.leaveTimes.delete(reqSid);
+          rs.players.set(reqSid, { sid: reqSid, name: existing.name, side: existing.side, stream: null });
+          scheduleRoomCleanup(rs);
+          json(res, 200, { sid: reqSid, side: existing.side, room, name: existing.name, players: serializePlayers(rs) });
+          return;
+        }
+        // stream 还活着 (重复 join): 直接返回
+        json(res, 200, { sid: reqSid, side: existing.side, room, name: existing.name, players: serializePlayers(rs) });
+        return;
+      }
       const leaveInfo = reqSid && rs.leaveTimes.get(reqSid);
       if (leaveInfo && Date.now() - leaveInfo.ts < 60000) {
         rs.leaveTimes.delete(reqSid);
@@ -378,7 +413,7 @@ async function handleRequest(req, res) {
       if (rs.pendingUndo) return json(res, 409, { error: '已有待定悔棋请求' });
       // 仅一人时: 直接悔棋 (无需等对方)
       if (rs.players.size < 2) {
-        executeUndo(rs);
+        executeUndo(rs, me.side);
         broadcast(rs, 'state', view(rs, 0));
         return json(res, 200, { ok: true, auto: true });
       }
@@ -394,7 +429,8 @@ async function handleRequest(req, res) {
       if (!rs.pendingUndo) return json(res, 400, { error: '没有待定悔棋请求' });
       // 只能由"对方"确认 (非请求方)
       if (rs.pendingUndo.requester === sid) return json(res, 400, { error: '请等待对方回应' });
-      executeUndo(rs);
+      const requester = rs.players.get(rs.pendingUndo.requester);
+      executeUndo(rs, requester ? requester.side : RED);
       rs.pendingUndo = null;
       broadcast(rs, 'state', view(rs, 0));
       return json(res, 200, { ok: true });

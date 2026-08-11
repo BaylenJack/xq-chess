@@ -95,6 +95,13 @@
       var joinBtn = document.getElementById('joinBtn');
       var roomInput = document.getElementById('roomname');
       var nameInput = document.getElementById('nickname');
+      // 恢复上次输入的昵称/房间 (返回时不丢)
+      try {
+        var savedName = localStorage.getItem('xq-last-name');
+        var savedRoom = localStorage.getItem('xq-last-room');
+        if (savedName && nameInput.value === '') nameInput.value = savedName;
+        if (savedRoom && roomInput.value === '') roomInput.value = savedRoom;
+      } catch (e) { /* localStorage 不可用忽略 */ }
       var showError = function (text) {
         var m = document.getElementById('modal');
         m.querySelector('.modal-card').textContent = text;
@@ -110,6 +117,11 @@
           showError('请填写房间名');
           return;
         }
+        // 记住昵称/房间 (下次进入自动填充)
+        try {
+          localStorage.setItem('xq-last-name', name);
+          localStorage.setItem('xq-last-room', room);
+        } catch (e) { /* 忽略 */ }
         var hint = new URLSearchParams(location.search).get('hint');
         var q = new URLSearchParams({ room: room, name: name });
         if (hint) q.set('hint', hint);
