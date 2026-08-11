@@ -1179,7 +1179,7 @@ button, input, [role="button"], select, textarea {
 }
 .timer-btn:active { transform: translateY(0); }
 
-/* 思考按钮行: 单独一行, 居中 */
+/* 思考按钮: 小圆钮, 单击普通 / 长按升读 */
 .think-row {
   display: flex;
   justify-content: center;
@@ -1187,11 +1187,29 @@ button, input, [role="button"], select, textarea {
 }
 .think-btn {
   flex: 0 0 auto;
-  min-width: 180px;
-  letter-spacing: 4px;
+  width: 56px;
+  min-width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: 0;
   font-weight: 600;
+  position: relative;
 }
-.think-btn svg { width: 16px; height: 16px; opacity: .9; }
+.think-btn svg { width: 22px; height: 22px; opacity: .9; }
+.think-btn .think-label {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.625rem;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  color: var(--ink-3);
+}
 
 /* 控制行: 倒计时 + 悔棋 + 重新开始 三按钮紧凑 */
 .control-row {

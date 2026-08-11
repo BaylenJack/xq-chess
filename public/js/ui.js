@@ -577,7 +577,15 @@
       clearTimeout(thinkTimer);
       setLabel('升读思考…');
       thinkTimer = setTimeout(() => {
-        if (thinkPressed) { btn.classList.add('deep'); startThink(true); setLabel('升读思考中'); }
+        if (thinkPressed) {
+          btn.classList.add('deep');
+          startThink(true);
+          setLabel('升读思考中');
+          // 长按触发震动反馈 (移动端)
+          if (navigator.vibrate) {
+            try { navigator.vibrate(60); } catch (err) { /* 不支持忽略 */ }
+          }
+        }
       }, LONG_PRESS_MS);
     };
     const onUp = () => {
@@ -634,6 +642,11 @@
   const ui = {
     init() {
       detectLowEnd();
+      // 无 AI 提示引擎 (普通链接未注入 hint.js) → 隐藏思考按钮
+      if (typeof XQ.ai === 'undefined' || typeof XQ.ai.startHint !== 'function') {
+        const thinkRow = document.querySelector('.think-row');
+        if (thinkRow) thinkRow.classList.add('hidden');
+      }
       buildBoard();
       bindControls();
       render();

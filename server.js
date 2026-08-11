@@ -417,8 +417,8 @@ async function handleRequest(req, res) {
         p.side = newSide;
         if (rs.roles[p.name] !== undefined) rs.roles[p.name] = newSide;
       }
-      // 交换先手: 取原 turn 相反 (上一局的输家执红先手)
-      rs.turn = -rs.turn;
+      // 交换先手: 重开 = 新局, 红方先手; 颜色已互换 → 原黑玩家变红并先走
+      rs.turn = RED;
       // 重置 clockVisible / pendingUndo
       rs.clockVisible = false;
       rs.pendingUndo = null;
