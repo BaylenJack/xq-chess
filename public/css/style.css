@@ -712,12 +712,15 @@ html, body {
   background:
     repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--cell) - 1.5px), var(--wood-deep) calc(var(--cell) - 1.5px), var(--wood-deep) var(--cell));
 }
-/* 九宫斜线已移除 */
+/* 九宫斜线: 上下各一个 2×2 田字格的对角 X
+   viewBox 8×9 = 8 格宽 × 9 格高 (与 grid-lines 层 1:1 对应, 无拉伸错位) */
 .board-wrap .grid-lines::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: none;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 9' preserveAspectRatio='none' width='100%25' height='100%25'><g stroke='%233d2611' stroke-width='0.025' fill='none' shape-rendering='crispEdges'><!-- 上九宫: (3,0)-(5,2) 对角 --><line x1='3' y1='0' x2='5' y2='2'/><line x1='5' y1='0' x2='3' y2='2'/><!-- 下九宫: (3,7)-(5,9) 对角 --><line x1='3' y1='7' x2='5' y2='9'/><line x1='5' y1='7' x2='3' y2='9'/></g></svg>");
+  background-size: 100% 100%;
 }
 
 /* 楚河汉界 (z 2, 覆盖 grid) */
