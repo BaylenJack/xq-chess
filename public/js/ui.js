@@ -63,6 +63,29 @@
     return e;
   }
 
+  // ---- 低端设备检测: 帧率低 → body.lite (禁光斑/粒子/模糊, 老手机流畅) ----
+  function detectLowEnd() {
+    // 硬件信号: 内存 < 2GB 或 老 WebKit (iOS < 15 的 Safari/微信)
+    const nav = root.navigator || {};
+    const mem = nav.deviceMemory;  // 仅 Chromium 有
+    const isOldWebKit = /OS (1[0-4])_/.test(nav.userAgent || '');  // iOS < 15
+    let lowEnd = (mem && mem < 4) || isOldWebKit;
+    if (lowEnd) document.body.classList.add('lite');
+    // 帧率实测: 30 帧采样, < 45fps 判定低端
+    let frames = 0;
+    const t0 = performance.now();
+    function sample(ts) {
+      frames++;
+      if (ts - t0 >= 500) {
+        const fps = frames / ((ts - t0) / 1000);
+        if (fps < 45) document.body.classList.add('lite');
+        return;
+      }
+      requestAnimationFrame(sample);
+    }
+    requestAnimationFrame(sample);
+  }
+
   // 数据驱动翻转: 逻辑行 r → 屏幕行 (红方翻转时上下颠倒)
   function viewR(r) { return flipped ? 9 - r : r; }
   // 屏幕行 → 逻辑行
@@ -493,6 +516,7 @@
 
   const ui = {
     init() {
+      detectLowEnd();
       buildBoard();
       bindControls();
       render();

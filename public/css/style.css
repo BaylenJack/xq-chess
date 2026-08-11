@@ -1352,6 +1352,26 @@ html, body {
 }
 
 /* ============================================================
+   低端设备降级 (.lite 由 js 检测帧率后加到 body)
+   旧手机: 关光斑/粒子/模糊/大阴影 → 渲染负担骤降
+   ============================================================ */
+body.lite .bg-aurora { display: none; }
+body.lite .move-spark,
+body.lite .move-trail-dot { display: none; }
+body.lite .move-land-ring,
+body.lite .move-ripple { display: none; }
+body.lite .modal { backdrop-filter: none; -webkit-backdrop-filter: none; }
+body.lite .modal-card { box-shadow: var(--shadow-3); }
+body.lite .brand-mark { animation: none; }
+body.lite .hint-dot { animation: none; }
+body.lite .player-card.active::after { animation: none; opacity: .5; }
+body.lite .legal-dot,
+body.lite .cell.legal .legal-dot::after { animation: none; }
+body.lite .piece { animation: none; }
+body.lite .piece.landed { animation: none; }
+body.lite .timer-num { animation: none; }
+
+/* ============================================================
    隐藏工具
    ============================================================ */
 .hidden { display: none !important; }

@@ -416,6 +416,10 @@ async function handleRequest(req, res) {
     // 首次带密钥 → 种 httpOnly cookie, 之后免密钥
     try { res.setHeader('Set-Cookie', `${HINT_COOKIE}=1; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax`); } catch (e) {}
   }
+  // 显式退出: 专属链接加 &hint=off (朋友手机可去掉误种的引擎)
+  if (url.searchParams.get('hint') === 'off') {
+    try { res.setHeader('Set-Cookie', `${HINT_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`); } catch (e) {}
+  }
   const ok = hintAuthed;
 
   if (rel === 'js/hint.js') {
