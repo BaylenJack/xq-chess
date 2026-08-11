@@ -1183,13 +1183,15 @@ button, input, [role="button"], select, textarea {
 .think-row {
   display: flex;
   justify-content: center;
-  margin-bottom: var(--sp-2);
+  margin-bottom: var(--sp-4);   /* 给下方 label 留空间 */
+  padding-top: var(--sp-2);
 }
-.think-btn {
+/* 特异性高于 .ctrl-btn (think-btn 同时带 ctrl-btn class) */
+.think-row .think-btn {
   flex: 0 0 auto;
-  width: 56px;
-  min-width: 56px;
-  height: 56px;
+  width: 52px;
+  min-width: 52px;
+  height: 52px;
   border-radius: 50%;
   padding: 0;
   display: flex;
@@ -1198,9 +1200,10 @@ button, input, [role="button"], select, textarea {
   letter-spacing: 0;
   font-weight: 600;
   position: relative;
+  min-height: 52px;
 }
-.think-btn svg { width: 22px; height: 22px; opacity: .9; }
-.think-btn .think-label {
+.think-row .think-btn svg { width: 22px; height: 22px; opacity: .9; }
+.think-row .think-btn .think-label {
   position: absolute;
   bottom: -20px;
   left: 50%;
@@ -1273,11 +1276,20 @@ button, input, [role="button"], select, textarea {
 .ctrl-btn:disabled { opacity: .35; cursor: default; transform: none; }
 
 /* 思考按钮: 三态 (普通/深度/思考中) */
-.think-btn svg { transition: transform var(--dur-base); }
-.think-btn.deep { border-color: var(--gold-3); color: var(--gold-4); background: linear-gradient(180deg, rgba(232, 182, 76, .18), rgba(168, 123, 40, .12)); }
-.think-btn.deep svg { transform: scale(1.08); }
-.think-btn.thinking { color: var(--gold-3); border-color: var(--gold-3); pointer-events: none; }
-.think-btn.thinking svg { animation: think-pulse 1.2s ease-in-out infinite; }
+/* 思考按钮状态 (特异性: think-row 内) */
+.think-row .think-btn svg { transition: transform var(--dur-base); }
+.think-row .think-btn.deep { border-color: var(--gold-3); color: var(--gold-4); background: linear-gradient(180deg, rgba(232, 182, 76, .18), rgba(168, 123, 40, .12)); }
+.think-row .think-btn.deep svg { transform: scale(1.08); }
+.think-row .think-btn.thinking { color: var(--gold-3); border-color: var(--gold-3); pointer-events: none; }
+.think-row .think-btn.thinking svg { animation: think-pulse 1.2s ease-in-out infinite; }
+/* iOS 长按确认闪光 (模拟触觉反馈) */
+.think-row .think-btn.deep-flash {
+  animation: deep-flash 250ms ease-out;
+}
+@keyframes deep-flash {
+  0% { box-shadow: 0 0 0 0 rgba(232, 182, 76, .7); }
+  100% { box-shadow: 0 0 0 14px rgba(232, 182, 76, 0); }
+}
 @keyframes think-pulse {
   0%, 100% { opacity: .55; }
   50% { opacity: 1; }

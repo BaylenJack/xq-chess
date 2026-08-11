@@ -581,9 +581,13 @@
           btn.classList.add('deep');
           startThink(true);
           setLabel('升读思考中');
-          // 长按触发震动反馈 (移动端)
+          // 触觉反馈: Android 用 Vibration API, iOS 无此 API → 用视觉脉冲 + 短音模拟
           if (navigator.vibrate) {
             try { navigator.vibrate(60); } catch (err) { /* 不支持忽略 */ }
+          } else {
+            playSound('select');   // iOS: 短促点击音作为长按确认反馈
+            btn.classList.add('deep-flash');
+            setTimeout(() => btn.classList.remove('deep-flash'), 250);
           }
         }
       }, LONG_PRESS_MS);
