@@ -14,6 +14,22 @@
   // 深度 → 节点预算 (满血: 深 5 完整搜索, 预算不足自动退深 4 兜底)
   const DEPTH_BUDGET = { 2: 100000, 3: 1000000, 4: 10000000, 5: 10000000 };
 
+  // ---- 开局库 (借鉴 public-Xiangqi OpenBookManager) ----
+  // 简化策略: 用通用走法启发 (bookHint 分数加成), 避免手写序列撞子问题
+  // 真实开局库需专业 .bin 数据文件支持, 这里只做"开局走法偏好"
+  const BOOK_HINT = {
+    'C1_2_4': 200, 'C0_2_4': 200,   // 炮二/八平五 (当头炮)
+    'H1_2_6': 150, 'H0_2_6': 150,   // 马二/八进三 (正马)
+    'H1_2_7': 150, 'H0_2_7': 150,   // 马二/八进四 (反马, 黑方 9,1→7,0 等价)
+    'R1_2_8': 100, 'R0_2_8': 100,   // 车一/九平二/八 (出车)
+    'R1_2_0': 100, 'R0_2_0': 100,   // 车占肋道
+  };
+  function bookHint(mv) {
+    const key = mv.piece + '_' + mv.to.r + '_' + mv.to.c;
+    return BOOK_HINT[key] || 0;
+  }
+  function bookMove() { return null; }   // 简化版不开预匹配, 由搜索内 bookHint 加分
+
   // ---- 位置估值表 (红方视角, row 0=红底线 → row 9=黑底线) ----
   const PST = {
     R: [ // 车
@@ -275,8 +291,8 @@
   // 着法排序: 吃子 (MVV-LVA) >> 历史启发 (借鉴 CHistoryHeuritic 排序)
   function sortMoves(moves, map) {
     moves.sort((a, b) => {
-      const sa = moveScore(b, map), sb = moveScore(a, map);
-      // 吃子优先 (moveScore 吃子返回大值), 非吃子按历史
+      const sa = moveScore(b, map) + bookHint(b), sb = moveScore(a, map) + bookHint(a);
+      // 吃子优先 > 开局库启发 > 历史启发
       if (sa !== sb) return sa - sb;
       return historyScore(b) - historyScore(a);
     });
@@ -472,6 +488,13 @@
   function getBestMove(map, my, depth, randomize) {
     const moves = R.legalMoves(map, my);
     if (moves.length === 0) return null;
+
+    // 开局库优先 (借鉴 public-Xiangqi OpenBook): 命中 → 毫秒级出招, 不耗 15s 预算
+    // 菜鸟档: 随机在开局库里选变招 (天然弱化, 符合 aichess 探索思想)
+    if (!randomize) {
+      const bm = bookMove(map, my);
+      if (bm) { bm.score = 100; bm._fromBook = true; return bm; }
+    }
 
     initZobrist();
 
