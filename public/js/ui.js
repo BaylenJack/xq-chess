@@ -542,76 +542,37 @@
     });
   }
 
-  // 思考按钮: 单击=普通思考 / 长按=升读思考; label 实时切换
-  const LONG_PRESS_MS = 600;
-  let thinkTimer = null, thinkPressed = false;
+  // 思考按钮: 单击开启/关闭深度思考
   function bindThinkBtn() {
     const btn = $('thinkBtn');
     if (!btn) return;
     const label = btn.querySelector('.think-label');
     const setLabel = (text) => { if (label) label.textContent = text; };
-    const startThink = (deep) => {
+    // 单击: 激活深度思考 (Worker 后台算, 轮到自己时显示提示)
+    const startThink = () => {
       if (XQ.thinking) return;
       XQ.thinking = true;
       btn.classList.add('thinking');
-      setLabel(deep ? '升读思考中' : '普通思考中');
+      setLabel('深度思考中');
       const onTurn = () => {
         if (!XQ.thinking) return;
         if (st.status !== G.STATUS.PLAYING || st.turn !== playerSide) return;
-        XQ.ai.startHint(deep ? 'hard' : 'medium', playerSide);
+        XQ.ai.startHint('hard', playerSide);
       };
       onTurn();
       XQ.thinkPoll = setInterval(onTurn, 300);
     };
     const endThink = () => {
       XQ.thinking = false;
-      clearTimeout(thinkTimer);
       clearInterval(XQ.thinkPoll);
       btn.classList.remove('thinking');
-      setLabel('普通思考');
+      setLabel('深度思考');
       XQ.ai.stopHint();
     };
-    const onDown = (e) => {
-      e.preventDefault();
-      thinkPressed = true;
-      clearTimeout(thinkTimer);
-      setLabel('升读思考…');
-      thinkTimer = setTimeout(() => {
-        if (thinkPressed) {
-          btn.classList.add('deep');
-          startThink(true);
-          setLabel('升读思考中');
-          // 触觉反馈: Android 用 Vibration API, iOS 无此 API → 用视觉脉冲 + 短音模拟
-          if (navigator.vibrate) {
-            try { navigator.vibrate(60); } catch (err) { /* 不支持忽略 */ }
-          } else {
-            playSound('select');   // iOS: 短促点击音作为长按确认反馈
-            btn.classList.add('deep-flash');
-            setTimeout(() => btn.classList.remove('deep-flash'), 250);
-          }
-        }
-      }, LONG_PRESS_MS);
-    };
-    const onUp = () => {
-      if (!thinkPressed) return;
-      thinkPressed = false;
-      clearTimeout(thinkTimer);
-      if (btn.classList.contains('deep')) {
-        btn.classList.remove('deep');
-      } else {
-        startThink(false);
-        setTimeout(endThink, 8000);
-      }
-    };
-    btn.addEventListener('mousedown', onDown);
-    btn.addEventListener('touchstart', onDown, { passive: false });
-    btn.addEventListener('mouseup', onUp);
-    btn.addEventListener('mouseleave', () => { if (thinkPressed && !btn.classList.contains('deep')) endThink(); });
-    btn.addEventListener('touchend', onUp);
-    btn.addEventListener('touchcancel', endThink);
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       if (XQ.thinking) endThink();
+      else startThink();
     });
   }
 

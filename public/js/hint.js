@@ -38,26 +38,21 @@
     if (side == null) return;
     if (st.turn !== side) return;  // 轮到自己才计算
     if (active.computing) return;
+    if (!worker) {
+      // Worker 不可用: 绝不主线程同步计算 (会冻结 UI 15 秒), 直接放弃
+      window.XQ.ai.stopHint();
+      XQ.ui.showHint(null);
+      return;
+    }
     active.computing = true;
     workerSeq++;
-    ensureWorker();
-    // 调用 ai 的限时迭代加深 (getBestMove 已支持)
-    if (worker) {
-      worker.postMessage({
-        id: workerSeq,
-        map: st.map,
-        my: side,
-        depth: active.level === 'hard' ? 10 : 5,
-        randomize: false,
-      });
-    } else {
-      // 退化: 同步
-      try {
-        const mv = XQ.ai.getBestMove(st.map, side, active.level === 'hard' ? 5 : 3, false);
-        active.computing = false;
-        XQ.ui.showHint(mv);
-      } catch (e) { active.computing = false; }
-    }
+    worker.postMessage({
+      id: workerSeq,
+      map: st.map,
+      my: side,
+      depth: 10,          // 只保留深度思考
+      randomize: false,
+    });
   }
 
   window.XQ.ai = window.XQ.ai || {};
