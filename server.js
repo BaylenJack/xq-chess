@@ -42,10 +42,16 @@ function safeEqual(a, b) {
   const hb = crypto.createHash('sha256').update(HINT_KEY).digest();
   return crypto.timingSafeEqual(ha, hb);
 }
-function authed(url) {
+const HINT_COOKIE = 'xq_hint_ok';
+// 验证 hint 权限: URL 带密钥 或 已有授权 cookie
+function authed(req, url) {
   if (!HINT_KEY) return false;
-  const given = url.searchParams.get('hint');
-  return !!given && safeEqual(given, HINT_KEY);
+  // 1. URL 带密钥 (首次访问)
+  const given = url && url.searchParams && url.searchParams.get('hint');
+  if (given && safeEqual(given, HINT_KEY)) return true;
+  // 2. 授权 cookie (已通过验证的会话)
+  const ck = String((req && req.headers && req.headers.cookie) || '');
+  return ck.includes(HINT_COOKIE + '=1');
 }
 
 // ---- 房间管理 (内存) ----
@@ -187,9 +193,9 @@ const MIME = {
 };
 const BLOCKED = new Set(['secret.txt', '.gitignore', 'server.js', 'package.json', 'README.md']);
 
-function injectHint(html, key) {
+function injectHint(html) {
   return html.replace('</body>',
-    `<script src="/js/hint.js?hint=${encodeURIComponent(key)}"></script></body>`);
+    `<script src="/js/hint.js?v=18"></script></body>`);
 }
 
 function readBody(req) {
@@ -362,7 +368,13 @@ async function handleRequest(req, res) {
   const norm = path.normalize('/' + p).replace(/\\/g, '/').replace(/\/{2,}/g, '/').replace(/\/+$/, '');
   if (norm.includes('..') || norm.includes('\0')) { res.writeHead(403); return res.end('Forbidden'); }
   const rel = norm.slice(1) || 'index.html';
-  const ok = authed(url);
+  // hint 权限: URL 带密钥 或 已有授权 cookie (首次带密钥访问 → 种 cookie, 后续全自动)
+  const hintAuthed = authed(req, url);
+  if (hintAuthed && url.searchParams.get('hint')) {
+    // 首次带密钥 → 种 httpOnly cookie, 之后免密钥
+    try { res.setHeader('Set-Cookie', `${HINT_COOKIE}=1; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax`); } catch (e) {}
+  }
+  const ok = hintAuthed;
 
   if (rel === 'js/hint.js') {
     if (!ok) { res.writeHead(404); return res.end('Not Found'); }
@@ -385,7 +397,7 @@ async function handleRequest(req, res) {
       // 进入页与棋盘页都注入 hint (游戏页带 hint 参数自动带入棋盘页)
       headers['Cache-Control'] = 'no-store';
       let html = data.toString('utf8');
-      if (ok) html = injectHint(html, HINT_KEY);
+      if (ok) html = injectHint(html);
       res.writeHead(200, headers);
       return res.end(html);
     }
