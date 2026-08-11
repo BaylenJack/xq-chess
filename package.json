@@ -1,0 +1,10 @@
+{
+  "name": "xq-chess",
+  "version": "1.0.0",
+  "description": "中国象棋小游戏 · AI 提示专属链接 (借鉴 itlwei/Chess, MIT)",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/test.js && node test/ai-test.js"
+  }
+}

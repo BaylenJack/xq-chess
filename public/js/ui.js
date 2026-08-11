@@ -1,0 +1,457 @@
+/*!
+ * xq-chess 界面 v3: 适配进入页 v3 / 棋盘页 v3 DOM
+ *  - 新增: 头像/角色名字节, 大号 monospace 倒计时, 状态徽章, 合法落点 .legal-dot, 落子 spring 入场
+ *  - 保留: SSE 在线同步, 翻转 (红方), 三档 AI 提示, 超时报负
+ */
+(function (root) {
+  'use strict';
+
+  const R = root.XQ.rules;
+  const G = root.XQ.game;
+
+  let st = G.create();
+  let playerSide = null;
+  let hintMove = null;
+  let flipped = false;   // 红方视角翻转 (自己的棋在下方)
+
+  let mySid = null, myRoom = null, es = null;
+
+  // ---- 音效 ----
+  let audioCtx = null;
+  function beep(freq, dur, type, vol) {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(vol || 0.12, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + dur);
+  }
+  function playSound(kind) {
+    if (!audioCtx) return;
+    switch (kind) {
+      case 'move': beep(330, 0.08, 'sine'); break;
+      case 'capture': beep(220, 0.12, 'triangle', 0.15); setTimeout(() => beep(165, 0.1, 'triangle', 0.12), 60); break;
+      case 'check': beep(660, 0.09, 'square', 0.07); setTimeout(() => beep(660, 0.09, 'square', 0.07), 110); break;
+      case 'win': [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, 0.18, 'sine', 0.14), i * 130)); break;
+      case 'lose': [392, 330, 262, 196].forEach((f, i) => setTimeout(() => beep(f, 0.2, 'sine', 0.13), i * 150)); break;
+      case 'select': beep(520, 0.05, 'sine', 0.08); break;
+      case 'hint': beep(880, 0.12, 'sine', 0.12); setTimeout(() => beep(1175, 0.18, 'sine', 0.12), 90); break;
+      case 'join': beep(440, 0.1, 'sine', 0.1); setTimeout(() => beep(660, 0.12, 'sine', 0.1), 100); break;
+      case 'timeout': beep(220, 0.4, 'sawtooth', 0.18); break;
+    }
+  }
+  function ensureAudio() {
+    if (!audioCtx) {
+      try { audioCtx = new (root.AudioContext || root.webkitAudioContext)(); } catch (e) { audioCtx = null; }
+    }
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  }
+
+  // ---- DOM ----
+  let boardEl = null, cells = [];
+  let selected = null, legalNow = [], illegalNow = [];
+  const $ = id => document.getElementById(id);
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  // 数据驱动翻转: 逻辑行 r → 屏幕行 (红方翻转时上下颠倒)
+  function viewR(r) { return flipped ? 9 - r : r; }
+  // 屏幕行 → 逻辑行
+  function logicR(vr) { return flipped ? 9 - vr : vr; }
+
+  function buildBoard() {
+    const wrap = $('board');
+    boardEl = el('div', 'board-wrap');
+    // 木纹底
+    boardEl.appendChild(el('div', 'wood-bg'));
+    // 网格线
+    boardEl.appendChild(el('div', 'grid-lines'));
+    // 楚河汉界
+    const riverBand = el('div', 'river-band');
+    riverBand.innerHTML = '<span class="river">楚&nbsp;河&nbsp;汉&nbsp;界</span>';
+    boardEl.appendChild(riverBand);
+    // 90 个格子: 按屏幕位置 vr 创建 (0=顶, 9=底)
+    cells = [];
+    for (let vr = 0; vr < 10; vr++) {
+      cells[vr] = [];
+      for (let c = 0; c < 9; c++) {
+        const cell = el('div', 'cell', '');
+        cell.dataset.r = vr; cell.dataset.c = c;  // 屏幕定位
+        cell.addEventListener('click', () => onCellClick(logicR(vr), c));
+        cells[vr][c] = { el: cell, pieceEl: null, dotEl: null, xEl: null };
+        boardEl.appendChild(cell);
+      }
+    }
+    wrap.appendChild(boardEl);
+    // 关键! 显式计算并设置 --cell (像素值), 避免嵌套 calc 失效
+    const boardW = boardEl.getBoundingClientRect().width;
+    const cellPx = Math.max(36, Math.floor(boardW / 9));
+    boardEl.style.setProperty('--cell', cellPx + 'px');
+    // 棋盘大小变化时重设
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(() => {
+        const w = boardEl.getBoundingClientRect().width;
+        const c = Math.max(36, Math.floor(w / 9));
+        boardEl.style.setProperty('--cell', c + 'px');
+      }).observe(boardEl);
+    }
+  }
+
+  function setPiece(r, c, piece) {
+    const cell = cells[r][c];
+    if (cell.pieceEl) { cell.pieceEl.remove(); cell.pieceEl = null; }
+    if (piece) {
+      const p = el('div', 'piece' + (R.isRed(piece) ? ' red' : ' black'));
+      // 文字包在内层 .glyph: 保证任何视角下棋子字永远正读, 且不与选中动画冲突
+      const glyph = el('span', 'glyph', R.charOf(piece));
+      p.appendChild(glyph);
+      cell.el.appendChild(p);
+      cell.pieceEl = p;
+    }
+  }
+
+  function render() {
+    // 棋子: 逻辑行 r → 屏幕行 viewR(r); 仅当棋子变化时更新 (不重建 → 不抖动)
+    for (let r = 0; r < 10; r++) {
+      const vr = viewR(r);
+      for (let c = 0; c < 9; c++) {
+        const cell = cells[vr][c];
+        const piece = st.map[r][c];
+        if (cell.pieceEl && cell.pieceEl.querySelector('.glyph')?.textContent === R.charOf(piece) && !!piece) continue;
+        if (cell.pieceEl) { cell.pieceEl.remove(); cell.pieceEl = null; }
+        if (piece) setPiece(vr, c, piece);
+      }
+    }
+    // 高亮类: 同样映射
+    for (let vr = 0; vr < 10; vr++) {
+      const r = logicR(vr);
+      for (let c = 0; c < 9; c++) {
+        const cell = cells[vr][c];
+        const cls = [];
+        if (selected && selected.r === r && selected.c === c) cls.push('sel');
+        const isLegal = legalNow.some(m => m.to.r === r && m.to.c === c);
+        const isIllegal = illegalNow.some(m => m.to.r === r && m.to.c === c);
+        if (isLegal) cls.push('legal');
+        if (isIllegal) cls.push('illegal');
+        if (st.lastMove) {
+          const mv = st.lastMove.mv;
+          if (mv.fr.r === r && mv.fr.c === c) cls.push('last-from');
+          if (mv.to.r === r && mv.to.c === c) cls.push('last-to');
+        }
+        if (st.check && st.map[r][c] && st.map[r][c][0] === (playerSide === G.RED ? 'K' : 'k')) cls.push('check');
+        if (hintMove) {
+          if (hintMove.fr.r === r && hintMove.fr.c === c) cls.push('hint-from');
+          if (hintMove.to.r === r && hintMove.to.c === c) cls.push('hint-to');
+        }
+        cell.el.className = 'cell' + (cls.length ? ' ' + cls.join(' ') : '');
+
+        // 合法落点小点 (独立元素, 翻转后通过 .legal-dot 反向 rotate)
+        if (isLegal && !cell.dotEl) {
+          const dot = el('div', 'legal-dot');
+          cell.el.appendChild(dot);
+          cell.dotEl = dot;
+        } else if (!isLegal && cell.dotEl) {
+          cell.dotEl.remove();
+          cell.dotEl = null;
+        }
+        // 送将红 X 标记 (伪合法但会被将军的落点)
+        if (isIllegal && !cell.xEl) {
+          const x = el('div', 'illegal-x', '✕');
+          cell.el.appendChild(x);
+          cell.xEl = x;
+        } else if (!isIllegal && cell.xEl) {
+          cell.xEl.remove();
+          cell.xEl = null;
+        }
+      }
+    }
+    updateStatus();
+  }
+
+  function myTurn() { return st.turn === playerSide; }
+  function isMine(r, c) {
+    const p = st.map[r][c];
+    return !!p && (R.isRed(p) ? 1 : -1) === playerSide;
+  }
+
+  function updateStatus() {
+    const p1 = document.querySelector('.player-card[data-side="1"]');
+    const p2 = document.querySelector('.player-card[data-side="-1"]');
+    if (p1) {
+      p1.classList.toggle('active', st.turn === 1);
+      const nameEl = p1.querySelector('.name');
+      if (nameEl) nameEl.textContent = (st.players || []).find(p => p.side === 1)?.name || '等待…';
+    }
+    if (p2) {
+      p2.classList.toggle('active', st.turn === -1);
+      const nameEl = p2.querySelector('.name');
+      if (nameEl) nameEl.textContent = (st.players || []).find(p => p.side === -1)?.name || '等待…';
+    }
+    if (st.status !== G.STATUS.PLAYING) {
+      $('status').textContent = st.status === G.STATUS.RED_WIN ? '红方胜！' : '黑方胜！';
+    } else {
+      const t = myTurn() ? '你的回合' : '对方回合';
+      $('status').textContent = st.check ? `将军 · ${t}` : t;
+    }
+    $('undoBtn').disabled = st.history.length === 0;
+  }
+
+  function onCellClick(r, c) {
+    ensureAudio();
+    if (st.status !== G.STATUS.PLAYING) return;
+    if (!myTurn()) return;
+    const piece = st.map[r][c];
+    if (selected) {
+      const mv = legalNow.find(m => m.to.r === r && m.to.c === c);
+      if (mv) { sendMove(mv); return; }
+      // 点击送将红 X 落点 → 提示原因
+      const ill = illegalNow.find(m => m.to.r === r && m.to.c === c);
+      if (ill) {
+        showModal('⚠ 这步会送将, 不能走');
+        playSound('select');
+        return;
+      }
+      if (piece && isMine(r, c)) { select(r, c); return; }
+      selected = null; legalNow = []; illegalNow = [];
+      render();
+      return;
+    }
+    if (piece && isMine(r, c)) select(r, c);
+  }
+
+  function select(r, c) {
+    selected = { r, c };
+    legalNow = G.legalMovesFrom(st, r, c);
+    // 伪合法但送将的着法 (红 X 提示)
+    illegalNow = R.illegalMovesFrom(st.map, { r, c });
+    playSound('select');
+    render();
+  }
+
+  function clearHint() {
+    if (hintMove) { hintMove = null; render(); }
+  }
+
+  async function api(path, body) {
+    const r = await fetch(`/api/${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || '请求失败');
+    return data;
+  }
+
+  async function joinRoom() {
+    const q = new URLSearchParams(location.search);
+    const room = q.get('room') || '';
+    const name = q.get('name') || '棋友';
+    if (!room) { location.href = '/'; return; }
+    myRoom = room;
+    try {
+      const data = await api('join', { room, name });
+      mySid = data.sid; playerSide = data.side;
+      // 红方翻转: 己方红子在下方 (数据驱动, 格子 data-r 定位已按屏幕位置)
+      flipped = playerSide === 1;
+      st = G.create();
+      st.players = data.players;
+      $('status').textContent = data.players.length < 2 ? '等待朋友加入…' : '对局开始';
+      // 清空棋盘所有棋子 (消除 init 阶段 flipped=false 的旧渲染), 再按正确视角渲染
+      for (let vr = 0; vr < 10; vr++) {
+        for (let c = 0; c < 9; c++) {
+          const cell = cells[vr][c];
+          if (cell.pieceEl) { cell.pieceEl.remove(); cell.pieceEl = null; }
+        }
+      }
+      render();
+      connectStream();
+      if (data.players.length >= 2) playSound('join');
+      XQ.timer.reset();
+    } catch (e) {
+      // 加入失败 (房间满等): 弹提示并回到进入页
+      showModal(e.message || '加入房间失败');
+      setTimeout(() => { location.href = '/'; }, 1600);
+    }
+  }
+
+  function connectStream() {
+    if (es) es.close();
+    es = new EventSource(`/api/stream?room=${encodeURIComponent(myRoom)}&sid=${mySid}`);
+    es.addEventListener('state', ev => {
+      const s = JSON.parse(ev.data);
+      // 检测新走子 (对比本地 history 与推送 history)
+      const newMoves = s.history.slice((st.history || []).length);
+      const last = s.history[s.history.length - 1];
+      // 记录走子动画信息 (render 前)
+      let animMove = null;
+      if (newMoves.length === 1 && last && last.mv) {
+        animMove = {
+          from: { r: last.mv.fr.r, c: last.mv.fr.c },
+          to: { r: last.mv.to.r, c: last.mv.to.c },
+          piece: last.mv.piece,
+          captured: !!last.captured,
+        };
+      }
+      st.map = s.map;
+      st.turn = s.turn;
+      st.status = s.status === 'playing' ? G.STATUS.PLAYING : (s.status === 'red_win' ? G.STATUS.RED_WIN : G.STATUS.BLACK_WIN);
+      st.check = s.check;
+      st.history = s.history;
+      st.lastMove = s.lastMove;
+      st.players = s.players;
+      if (last) playSound(last.captured ? 'capture' : 'move');
+      if (s.check) playSound('check');
+      if (s.status !== 'playing') {
+        playSound(s.status === 'red_win' ? 'win' : 'lose');
+        // 仅在超时/有人离开时弹窗; 普通胜负由状态徽章 + 走子音效提示即可
+        if (s.reason === 'timeout') {
+          showModal(s.winner === mySid ? '🎉 对方超时 · 你赢了' : '⏰ 超时判负');
+        } else if (s.reason === 'peer_left') {
+          showModal('🎉 对手离开 · 你赢了');
+        }
+        XQ.timer.disable();
+      } else if (s.turn !== st.turn) {
+        // 回合切换 → 切换计时器到对方
+        XQ.timer.switchSide(s.turn);
+      } else if (last) {
+        // 同回合 (如悔棋) → 重置
+        XQ.timer.reset();
+      }
+      selected = null; legalNow = []; illegalNow = []; clearHint();
+      render();
+      // 走子动画: 原位置光点 + 落子环绕发光 (渲染后)
+      if (animMove) {
+        animateMove(animMove);
+      }
+      G.emit('change', st);
+    });
+    es.addEventListener('start', ev => {
+      const s = JSON.parse(ev.data);
+      st.players = s.players;
+      showModal('对局开始');
+      playSound('join');
+      XQ.timer.reset();
+      render();
+    });
+    es.addEventListener('peer_left', ev => {
+      const s = JSON.parse(ev.data);
+      showModal(s.message || '对手离开了');
+    });
+    es.addEventListener('error', () => {
+      // EventSource 断线: 显示断线状态 (会自动重连, 重连后 server 推送最新 state)
+      const statusEl = $('status');
+      if (statusEl && st.status === G.STATUS.PLAYING && statusEl.textContent.indexOf('断线') === -1) {
+        statusEl.textContent = '连接中断,重连中…';
+      }
+    });
+  }
+
+  function sendMove(mv) {
+    const res = G.tryMove(st, mv);
+    if (!res.ok) return;
+    selected = null; legalNow = []; illegalNow = [];
+    render();
+    // 本地走子也触发过渡动画 (乐观更新, 服务端 state 回来时 newMoves=0 不重复触发)
+    animateMove({ from: mv.fr, to: mv.to, piece: mv.piece, captured: !!mv.captured });
+    api('move', { room: myRoom, sid: mySid, mv: { fr: mv.fr, to: mv.to } })
+      .catch(e => showModal(e.message));
+  }
+
+  // 走子过渡动画: 原位置发光点 + 跳跃粒子 + 落子环绕 + 落地涟漪
+  function animateMove(m) {
+    const fromCell = cells[viewR(m.from.r)][m.from.c];
+    const toCell = cells[viewR(m.to.r)][m.to.c];
+
+    // 原位置: 发光点 (明亮光晕 + 脉冲扩散, 与落子圈区分)
+    if (fromCell && fromCell.el) {
+      const dot = el('div', 'move-trail-dot');
+      fromCell.el.appendChild(dot);
+      setTimeout(() => dot.remove(), 1300);
+    }
+    // 跳跃轨迹: 弧线粒子带 (从原位置飘向落点)
+    if (fromCell && toCell) {
+      const fromEl = fromCell.el;
+      const toEl = toCell.el;
+      const fx = fromEl.getBoundingClientRect().left + fromEl.offsetWidth / 2;
+      const fy = fromEl.getBoundingClientRect().top + fromEl.offsetHeight / 2;
+      const tx = toEl.getBoundingClientRect().left + toEl.offsetWidth / 2;
+      const ty = toEl.getBoundingClientRect().top + toEl.offsetHeight / 2;
+      const boardRect = boardEl.getBoundingClientRect();
+      for (let i = 1; i <= 5; i++) {
+        const t = i / 6;
+        const spark = el('div', 'move-spark');
+        const x = fx + (tx - fx) * t;
+        const y = fy + (ty - fy) * t - Math.sin(t * Math.PI) * (boardRect.width * 0.12);
+        spark.style.left = (x - boardRect.left) + 'px';
+        spark.style.top = (y - boardRect.top) + 'px';
+        boardEl.appendChild(spark);
+        spark.style.animationDelay = (t * 260) + 'ms';
+        setTimeout(() => spark.remove(), 260 + t * 260 + 400);
+      }
+    }
+    // 落子位置: 环绕发光 + 涟漪
+    if (toCell && toCell.el) {
+      const ring = el('div', 'move-land-ring');
+      toCell.el.appendChild(ring);
+      setTimeout(() => ring.remove(), 1200);
+      const piece = toCell.el.querySelector('.piece');
+      if (piece) {
+        piece.classList.add('landed');
+        setTimeout(() => piece.classList.remove('landed'), 450);
+      }
+      const ripple = el('div', 'move-ripple');
+      toCell.el.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 700);
+    }
+  }
+
+  function bindControls() {
+    $('undoBtn').addEventListener('click', () => {
+      ensureAudio();
+      api('undo', { room: myRoom, sid: mySid }).catch(e => showModal(e.message));
+    });
+    $('restartBtn').addEventListener('click', () => {
+      api('restart', { room: myRoom, sid: mySid }).catch(e => showModal(e.message));
+    });
+    XQ.timer.onExpire(() => {
+      playSound('timeout');
+      api('timeout', { room: myRoom, sid: mySid }).catch(() => {});
+    });
+  }
+
+  function showModal(text) {
+    const m = $('modal');
+    m.querySelector('.modal-card').textContent = text;
+    m.classList.add('show');
+    setTimeout(() => m.classList.remove('show'), 3200);
+  }
+
+  const ui = {
+    init() {
+      buildBoard();
+      bindControls();
+      render();
+      joinRoom();
+    },
+    showHint(mv) {
+      hintMove = mv ? { fr: mv.fr, to: mv.to } : null;
+      render();
+    },
+    get state() { return st; },
+    get playerSide() { return playerSide; },
+    _setHint(v) { hintMove = v; },
+  };
+
+  root.XQ = root.XQ || {};
+  root.XQ.ui = ui;
+})(typeof globalThis !== 'undefined' ? globalThis : this);

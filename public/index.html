@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>对弈 · 中国象棋</title>
+  <link rel="stylesheet" href="/css/style.css?v=11">
+</head>
+<body class="lobby-body">
+
+  <!-- 远景光斑 -->
+  <div class="bg-aurora">
+    <span class="blob a"></span>
+    <span class="blob b"></span>
+    <span class="blob c"></span>
+  </div>
+
+  <!-- 顶部品牌 -->
+  <header class="brand">
+    <div class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="m" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#f4d27a"/>
+            <stop offset="100%" stop-color="#a87b28"/>
+          </linearGradient>
+        </defs>
+        <circle cx="32" cy="32" r="30" fill="url(#m)" stroke="#3d2611" stroke-width="2"/>
+        <text x="32" y="44" text-anchor="middle" font-family="KaiTi,STKaiti,serif" font-size="38" font-weight="bold" fill="#8b0000">帥</text>
+      </svg>
+    </div>
+    <div class="brand-text">
+      <h1>对弈</h1>
+      <p>中国象棋 · 棋友对局</p>
+    </div>
+  </header>
+
+  <!-- 中央卡片 -->
+  <main class="lobby-card-wrap">
+    <div class="lobby-card">
+      <div class="card-corner tl" aria-hidden="true"></div>
+      <div class="card-corner tr" aria-hidden="true"></div>
+      <div class="card-corner bl" aria-hidden="true"></div>
+      <div class="card-corner br" aria-hidden="true"></div>
+
+      <div class="card-header">
+        <span class="kicker">开启对局</span>
+        <h2>与友手谈</h2>
+        <p class="sub">输入<strong>相同的房间名</strong>,即可隔空对弈。先入者执红,后入者执黑。</p>
+      </div>
+
+      <div class="card-body">
+        <label class="field">
+          <input id="nickname" type="text" maxlength="12" autocomplete="off" placeholder=" ">
+          <span class="field-label">你的昵称</span>
+          <span class="field-line"></span>
+        </label>
+
+        <label class="field">
+          <input id="roomname" type="text" maxlength="20" autocomplete="off" placeholder=" " autofocus>
+          <span class="field-label">房间名</span>
+          <span class="field-line"></span>
+        </label>
+
+        <button id="joinBtn" class="cta">
+          <span class="cta-text">进入棋盘</span>
+          <span class="cta-arrow">→</span>
+        </button>
+      </div>
+
+      <div class="card-footer">
+        <span class="hint-dot"></span>
+        <small>小提示:昵称会显示给对手;房间名越独特越不容易撞房。</small>
+      </div>
+    </div>
+
+    <div class="hero-stamp" aria-hidden="true">
+      <svg viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r="56" fill="none" stroke="#e8b64c" stroke-width="1" stroke-opacity=".4"/>
+        <circle cx="60" cy="60" r="44" fill="none" stroke="#e8b64c" stroke-width="0.5" stroke-opacity=".5"/>
+        <text x="60" y="68" text-anchor="middle" font-family="KaiTi,STKaiti,serif" font-size="22" fill="#e8b64c" fill-opacity=".65" letter-spacing="6">楚河漢界</text>
+      </svg>
+    </div>
+  </main>
+
+  <!-- 底部 -->
+  <footer class="footline">
+    <span>静夜思 · 一枰起</span>
+  </footer>
+
+  <div id="modal" class="modal"><div class="modal-card"></div></div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      var joinBtn = document.getElementById('joinBtn');
+      var roomInput = document.getElementById('roomname');
+      var nameInput = document.getElementById('nickname');
+      var showError = function (text) {
+        var m = document.getElementById('modal');
+        m.querySelector('.modal-card').textContent = text;
+        m.classList.add('show');
+        setTimeout(function () { m.classList.remove('show'); }, 1800);
+      };
+      var go = function () {
+        var room = roomInput.value.trim();
+        var name = nameInput.value.trim() || '棋友';
+        if (!room) {
+          roomInput.parentElement.classList.add('shake');
+          setTimeout(function () { roomInput.parentElement.classList.remove('shake'); }, 500);
+          showError('请填写房间名');
+          return;
+        }
+        var hint = new URLSearchParams(location.search).get('hint');
+        var q = new URLSearchParams({ room: room, name: name });
+        if (hint) q.set('hint', hint);
+        location.href = '/game.html?' + q.toString();
+      };
+      joinBtn.addEventListener('click', go);
+      roomInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
+      nameInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
+    });
+  </script>
+</body>
+</html>

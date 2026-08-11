@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>对弈 · 中国象棋</title>
+  <link rel="stylesheet" href="/css/style.css?v=11c">
+</head>
+<body class="game-body">
+
+  <div class="bg-aurora" aria-hidden="true">
+    <span class="blob a"></span>
+    <span class="blob b"></span>
+  </div>
+
+  <header class="game-top">
+    <div class="player-card" data-side="1">
+      <div class="player-frame">
+        <div class="avatar red"><span class="avatar-mark">帥</span></div>
+        <div class="player-meta">
+          <span class="role">执红</span>
+          <span class="name" id="p1-name">红方</span>
+        </div>
+        <div class="clock" id="clock-1">
+          <span class="clock-num">60</span>
+          <span class="clock-unit">s</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="vs-block"><span class="vs-char">VS</span></div>
+
+    <div class="player-card" data-side="-1">
+      <div class="player-frame">
+        <div class="avatar black"><span class="avatar-mark">將</span></div>
+        <div class="player-meta">
+          <span class="role">执黑</span>
+          <span class="name" id="p2-name">黑方</span>
+        </div>
+        <div class="clock" id="clock-2">
+          <span class="clock-num">60</span>
+          <span class="clock-unit">s</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="board-stage">
+    <div class="board-corner tl" aria-hidden="true"></div>
+    <div class="board-corner tr" aria-hidden="true"></div>
+    <div class="board-corner bl" aria-hidden="true"></div>
+    <div class="board-corner br" aria-hidden="true"></div>
+
+    <div id="board" class="board-wrap" aria-label="棋盘"></div>
+
+    <div id="status" class="status-pill">进入房间中…</div>
+  </section>
+
+  <footer class="game-controls">
+    <div class="control-row">
+      <button id="undoBtn" class="ctrl-btn">悔棋</button>
+      <button id="restartBtn" class="ctrl-btn">重新开始</button>
+    </div>
+    <div id="hintSlot" class="hint-slot"></div>
+  </footer>
+
+  <div id="modal" class="modal"><div class="modal-card"></div></div>
+
+  <script src="/js/rules.js?v=11c"></script>
+  <script src="/js/ai.js?v=11c"></script>
+  <script src="/js/game.js?v=11c"></script>
+  <script src="/js/ui.js?v=11c"></script>
+  <script src="/js/timer.js?v=11c"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => XQ.ui.init());
+  </script>
+</body>
+</html>
