@@ -597,6 +597,24 @@ button, input, [role="button"], select, textarea {
 }
 .avatar.red .avatar-mark { color: rgba(255, 230, 200, .95); }
 
+/* 在线状态点 (头像右下角) */
+.online-dot {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #4ade80;
+  border: 2px solid rgba(0, 0, 0, .5);
+  box-shadow: 0 0 6px rgba(74, 222, 128, .6);
+  transition: background var(--dur-base), box-shadow var(--dur-base);
+}
+.online-dot.offline {
+  background: #6b7280;
+  box-shadow: none;
+}
+
 .player-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .player-meta .role {
   font-family: var(--font-serif);

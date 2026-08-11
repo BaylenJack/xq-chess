@@ -109,9 +109,14 @@ function broadcast(rs, event, data) {
   }
 }
 
-// 序列化房间内所有玩家 (含 sid, 用于客户端反向查自己)
+// 序列化房间内所有玩家 (含 sid + online 状态, 用于客户端反向查自己/显示在线状态)
 function serializePlayers(rs) {
-  return [...rs.players.values()].map(p => ({ sid: p.sid, name: p.name, side: p.side }));
+  return [...rs.players.values()].map(p => ({
+    sid: p.sid,
+    name: p.name,
+    side: p.side,
+    online: !!(p.stream && !p.stream.destroyed && !p.stream.writableEnded),
+  }));
 }
 
 // 悔棋: 退到"请求者"自己上一步 (请求者 = 悔自己刚走的那手)
@@ -375,6 +380,8 @@ async function handleRequest(req, res) {
       me.stream = res;
       // 立即推送当前状态
       res.write(`event: state\ndata: ${JSON.stringify(view(rs, me.side))}\n\n`);
+      // 上线: 广播在线状态更新 (含自己, 让两方玩家卡同步)
+      broadcast(rs, 'players', { players: serializePlayers(rs) });
       req.on('close', () => {
         // 仅当这是当前有效的 stream 时才清理 (防止旧连接 close 误删新连接的玩家)
         if (rs.players.get(sid) && rs.players.get(sid).stream === res) {
@@ -383,11 +390,13 @@ async function handleRequest(req, res) {
           me.stream = null;
           // 记录离开信息 (含角色!): 60s 内凭 sid 可恢复续局, 角色不丢
           rs.leaveTimes.set(sid, { ts: Date.now(), name: leaving.name, side: leaving.side });
-          // 只剩一人 → 通知剩余玩家等待
+          // 只剩一人 → 通知剩余玩家等待 + 广播离线状态
           if (rs.players.size === 1) {
             const rest = [...rs.players.values()][0];
             try { rest.stream.write(`event: peer_left\ndata: ${JSON.stringify({ message: '对手离开了' })}\n\n`); } catch (e) {}
           }
+          // 广播在线状态变化 (离线)
+          broadcast(rs, 'players', { players: serializePlayers(rs) });
           scheduleRoomCleanup(rs);
         }
       });

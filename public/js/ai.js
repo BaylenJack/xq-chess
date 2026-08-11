@@ -136,6 +136,13 @@
     }
     return total < 1500;   // 约剩 2车1炮 以下
   }
+  // 局面自适应时间预算 (借鉴 Pikafish timeLimit 思想):
+  // 子力越少 → 搜索越快 → 提前出结果, 不等满预算
+  // 残局 (子力<1500): 预算减半; 中局: 全预算
+  function adaptiveBudget(map, base) {
+    if (isEndgame(map)) return Math.max(2000, Math.floor(base * 0.5));
+    return base;
+  }
   // 盘面子力密度 (用于深度自适应: 开局子多 → 分支因子大, 自动降层)
   function pieceCount(map) {
     let n = 0;
@@ -269,9 +276,11 @@
     const e = TT.get(hash);
     if (e && e.depth >= depth) return;  // 已有更深条目
     TT.set(hash, { score, depth, flag, mv: mv || null });
-    // 防无限增长: 超 20 万条清空 (对局搜索间隙清理)
-    if (TT.size > 200000) TT.clear();
+    // 防无限增长: 中局 20 万条清空, 残局 10 万 (残局搜索深但局面少, 保留深层条目)
+    const ttLimit = isEndgame(lastMap) ? 100000 : 200000;
+    if (TT.size > ttLimit) TT.clear();
   }
+  let lastMap = null;   // 最近一次评估的棋盘 (ttStore 判断残局用)
 
   // ---- 历史启发表: [兵种][目标格] 累积得分 (借鉴 CHistoryHeuritic: 好着法加 2<<depth, 坏着法减) ----
   // 生命周期: 每次 getBestMove 清空, 防止跨对局污染
@@ -488,6 +497,7 @@
   function getBestMove(map, my, depth, randomize) {
     const moves = R.legalMoves(map, my);
     if (moves.length === 0) return null;
+    lastMap = map;   // ttStore 残局判定用
 
     // 开局库优先 (借鉴 public-Xiangqi OpenBook): 命中 → 毫秒级出招, 不耗 15s 预算
     // 菜鸟档: 随机在开局库里选变招 (天然弱化, 符合 aichess 探索思想)
@@ -540,7 +550,7 @@
 
     // 目标深度: 高手 10 层; 中级 7 层; 菜鸟 5 层
     const targetDepth = depth >= 5 ? 10 : (depth >= 3 ? 7 : 5);
-    const timeBudget = depth >= 5 ? TIME_LIMIT_MS : (depth >= 3 ? 6000 : 3000);
+    const timeBudget = depth >= 5 ? adaptiveBudget(map, TIME_LIMIT_MS) : (depth >= 3 ? 6000 : 3000);
 
     const start = Date.now();
     let bestMove = null;

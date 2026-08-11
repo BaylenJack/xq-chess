@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>对弈 · 中国象棋</title>
-  <link rel="stylesheet" href="/css/style.css?v=35">
+  <link rel="stylesheet" href="/css/style.css?v=36">
 </head>
 <body class="game-body">
 
@@ -16,7 +16,7 @@
   <header class="game-top">
     <div class="player-card" data-side="1">
       <div class="player-frame">
-        <div class="avatar red"><span class="avatar-mark">帥</span></div>
+        <div class="avatar red"><span class="avatar-mark">帥</span><span class="online-dot" data-for="p1"></span></div>
         <div class="player-meta">
           <span class="role">执红</span>
           <span class="name" id="p1-name">红方</span>
@@ -28,7 +28,7 @@
 
     <div class="player-card" data-side="-1">
       <div class="player-frame">
-        <div class="avatar black"><span class="avatar-mark">將</span></div>
+        <div class="avatar black"><span class="avatar-mark">將</span><span class="online-dot" data-for="p2"></span></div>
         <div class="player-meta">
           <span class="role">执黑</span>
           <span class="name" id="p2-name">黑方</span>
@@ -70,11 +70,11 @@
 
   <div id="modal" class="modal"><div class="modal-card"></div></div>
 
-  <script src="/js/rules.js?v=35"></script>
-  <script src="/js/ai.js?v=35"></script>
-  <script src="/js/game.js?v=35"></script>
-  <script src="/js/ui.js?v=35"></script>
-  <script src="/js/timer.js?v=35"></script>
+  <script src="/js/rules.js?v=36"></script>
+  <script src="/js/ai.js?v=36"></script>
+  <script src="/js/game.js?v=36"></script>
+  <script src="/js/ui.js?v=36"></script>
+  <script src="/js/timer.js?v=36"></script>
   <script>
     window.addEventListener('DOMContentLoaded', () => XQ.ui.init());
   </script>

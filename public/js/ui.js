@@ -316,6 +316,7 @@
       flipped = playerSide === 1;
       st = G.create();
       st.players = data.players;
+      applyOnlineStatus(data.players);
       $('status').textContent = data.players.length < 2 ? '等待朋友加入…' : '对局开始';
       // 清空棋盘所有棋子 (消除 init 阶段 flipped=false 的旧渲染), 再按正确视角渲染
       for (let vr = 0; vr < 10; vr++) {
@@ -430,6 +431,23 @@
         statusEl.textContent = '连接中断,重连中…';
       }
     });
+    // 在线状态更新 (双方玩家卡)
+    es.addEventListener('players', ev => {
+      const s = JSON.parse(ev.data);
+      applyOnlineStatus(s.players || []);
+    });
+  }
+
+  // 更新玩家卡在线状态 (p1=红, p2=黑)
+  function applyOnlineStatus(players) {
+    for (const p of players || []) {
+      const isRed = p.side === 1;
+      const dot = document.querySelector(`.online-dot[data-for="${isRed ? 'p1' : 'p2'}"]`);
+      if (dot) dot.classList.toggle('offline', !p.online);
+      // 同步自己视角 (我 = playerSide)
+      const meDot = document.querySelector(`.online-dot[data-for="${playerSide === 1 ? 'p1' : 'p2'}"]`);
+      if (meDot && p.sid === mySid) meDot.classList.toggle('offline', !p.online);
+    }
   }
 
   function sendMove(mv) {
