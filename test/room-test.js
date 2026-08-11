@@ -41,6 +41,8 @@ function sseClient(url, handlers) {
   });
   req.on('error', () => {});
   req.end();
+  // 真正断开连接 (供测试模拟玩家退出)
+  ee.destroy = () => req.destroy();
   return ee;
 }
 
@@ -118,8 +120,39 @@ async function main() {
   assert(initMoves === 32, `重开后棋盘 32 子 (实际 ${initMoves})`);
   assert(afterRestart.history.length === 0 && afterRestart.turn === 1, '重开后轮到红方');
 
-  // 12. 吃将终局验证: 直接走将死路线
-  // 简化: 服务端 rules 已测, 此处验证 move 接口接受吃将
+  // 12. 倒计时面板开关: 一方 toggle → 双方收到 clockVisible 同步
+  const states1Before = states1.length;
+  const ct = await api('clock-toggle', { room, sid: r1.sid });
+  assert(ct.ok && ct.clockVisible === true, 'clock-toggle 成功且返回 true');
+  await new Promise(res => setTimeout(res, 400));
+  assert(states1.length > states1Before, 'toggle 后双方收到新 state');
+  assert(states1[states1.length - 1].clockVisible === true, '红方 state 同步 clockVisible=true');
+  assert(states2[states2.length - 1].clockVisible === true, '黑方 state 同步 clockVisible=true');
+  // 再 toggle 回来
+  await api('clock-toggle', { room, sid: r2.sid });
+  await new Promise(res => setTimeout(res, 400));
+  assert(states1[states1.length - 1].clockVisible === false, '再 toggle 后双方 clockVisible=false');
+
+  // 13. 退出重进: 颜色补空缺而非按人数 (防死局)
+  const room2 = 'roomtest-re-' + Math.random().toString(36).slice(2, 8);
+  const re1 = await api('join', { room: room2, name: '先入' });
+  assert(re1.side === 1, 'room2 先入 = 红');
+  const re2 = await api('join', { room: room2, name: '后入' });
+  assert(re2.side === -1, 'room2 后入 = 黑');
+  // 先入者 (红) 的 stream 断开 → 模拟退出
+  const esRe1 = sseClient(`${BASE}/api/stream?room=${room2}&sid=${re1.sid}`, {});
+  await new Promise(res => setTimeout(res, 300));
+  esRe1.destroy && esRe1.destroy();   // 断开 stream → 服务端清理该玩家
+  await new Promise(res => setTimeout(res, 500));
+  // 先入者重进 → 应补红方空缺 (而非按人数判黑)
+  const re3 = await api('join', { room: room2, name: '先入' });
+  assert(re3.ok, '重进成功');
+  assert(re3.side === 1, `重进补红方空缺 (实际 side=${re3.side})`);
+  // 现在应两人齐全: 红(重进者) + 黑(后入者), 无颜色冲突
+  assert(re3.players.length === 2, '重进后房间 2 人');
+  const sides = re3.players.map(p => p.side).sort();
+  assert(JSON.stringify(sides) === JSON.stringify([-1, 1]), '房间颜色不冲突 (红+黑各一)');
+
   es1.removeAllListeners(); es2.removeAllListeners();
   es1.destroy && es1.destroy(); es2.destroy && es2.destroy();
   console.log(`\n房间联调: ${passed} 通过, ${failed} 失败`);

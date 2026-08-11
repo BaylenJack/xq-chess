@@ -333,6 +333,8 @@
       st.players = s.players;
       // 倒计时: 服务端权威 (deadline 广播), 两方同步
       if (s.clock) XQ.timer.sync(s.clock.deadline, s.clock.on);
+      // 倒计时面板显隐: 服务端广播, 双方同步
+      if (typeof XQ.applyClockVisible === 'function') XQ.applyClockVisible(s.clockVisible);
       if (last) playSound(last.captured ? 'capture' : 'move');
       if (s.check) playSound('check');
       if (s.status !== 'playing') {
@@ -448,25 +450,28 @@
     $('restartBtn').addEventListener('click', () => {
       api('restart', { room: myRoom, sid: mySid }).catch(e => showModal(e.message));
     });
-    // 倒计时按钮: 显示/隐藏 单个倒计时
+    // 倒计时按钮: 开关走服务端广播, 双方同步显隐
     const timerBtn = document.getElementById('timerBtn');
     const timerDisplay = document.getElementById('timerDisplay');
     if (timerBtn && timerDisplay) {
       timerBtn.addEventListener('click', () => {
         ensureAudio();
-        const hidden = timerDisplay.classList.contains('hidden');
-        timerDisplay.classList.toggle('hidden');
-        timerBtn.classList.toggle('active', !hidden ? false : true);
-        if (!hidden) {
-          // 关闭 → 停表
-          XQ.timer.stop();
-        } else {
-          // 打开 → 开始倒计时
-          XQ.timer.reset();
-        }
+        // 本地不切换, 等 server 广播 state 后再切 (clockVisible 同步)
+        api('clock-toggle', { room: myRoom, sid: mySid }).catch(() => {});
         playSound('select');
       });
     }
+    // 根据 server 广播的 clockVisible 同步显隐
+    function applyClockVisible(v) {
+      if (!timerBtn || !timerDisplay) return;
+      const show = !!v;
+      timerDisplay.classList.toggle('hidden', !show);
+      timerBtn.classList.toggle('active', show);
+      if (!show) {
+        XQ.timer.stop();
+      }
+    }
+    XQ.applyClockVisible = applyClockVisible;
     XQ.timer.onExpire(() => {
       playSound('timeout');
       api('timeout', { room: myRoom, sid: mySid }).catch(() => {});

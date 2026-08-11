@@ -79,6 +79,7 @@ function roomState(room) {
       check: false,
       lastMove: null,
       clock: { deadline: 0, on: false },   // 服务端权威倒计时: 走子后重置
+      clockVisible: false,                 // 倒计时面板显隐 (服务端广播, 双方同步)
       emptyTimer: null,
       soloTimer: null,
     };
@@ -129,6 +130,7 @@ function view(rs, forSide, extra) {
     you: forSide,
     players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })),
     clock: { deadline: rs.clock.deadline, on: rs.clock.on },   // 权威倒计时
+    clockVisible: rs.clockVisible,   // 倒计时面板显隐 (同步)
     ...(extra || {}),
   };
 }
@@ -239,7 +241,9 @@ async function handleRequest(req, res) {
         }
       }
       if (isFull(rs)) return json(res, 409, { error: '房间已满' });
-      const side = rs.players.size === 0 ? RED : BLACK;
+      // 按已占颜色分配: 红方空缺 → 红, 否则 → 黑 (防止重进撞角色死局)
+      const hasRed = [...rs.players.values()].some(p => p.side === RED);
+      const side = hasRed ? BLACK : RED;
       rs.players.set(sid, { sid, name, side, stream: null });
       scheduleRoomCleanup(rs);  // 加入后重排清理 (2 人 → 不再清理)
       json(res, 200, { sid, side, room, name, players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })) });
@@ -323,6 +327,13 @@ async function handleRequest(req, res) {
       resetClock(rs);
       broadcast(rs, 'state', view(rs, 0));
       return json(res, 200, { ok: true });
+    }
+
+    // 倒计时面板开关 (服务端广播, 双方同步显隐)
+    if (url.pathname === '/api/clock-toggle' && req.method === 'POST') {
+      rs.clockVisible = !rs.clockVisible;
+      broadcast(rs, 'state', view(rs, 0));
+      return json(res, 200, { ok: true, clockVisible: rs.clockVisible });
     }
 
     // 超时判负 (客户端 60s 倒计时归零时上报)
