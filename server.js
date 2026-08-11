@@ -109,6 +109,11 @@ function broadcast(rs, event, data) {
   }
 }
 
+// 序列化房间内所有玩家 (含 sid, 用于客户端反向查自己)
+function serializePlayers(rs) {
+  return [...rs.players.values()].map(p => ({ sid: p.sid, name: p.name, side: p.side }));
+}
+
 // 悔棋: 退 1 步 (悔自己走的那手); 还原 turn = 走出该步的人的颜色
 function executeUndo(rs) {
   if (rs.history.length === 0) return;
@@ -150,7 +155,7 @@ function view(rs, forSide, extra) {
     history: rs.history.map(h => ({ mv: h.mv, captured: h.captured })),
     lastMove: rs.lastMove,
     you: forSide,
-    players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })),
+    players: [...rs.players.values()].map(p => ({ sid: p.sid, name: p.name, side: p.side })),   // 含 sid: 客户端反向查自己 (重启互换后必须)
     clock: { deadline: rs.clock.deadline, on: rs.clock.on },   // 权威倒计时
     clockVisible: rs.clockVisible,   // 倒计时面板显隐 (同步)
     ...(extra || {}),
@@ -276,16 +281,16 @@ async function handleRequest(req, res) {
         };
         // 若该 sid 已存在 (极端并发), 直接返回
         if (rs.players.has(reqSid)) {
-          json(res, 200, { sid: reqSid, side: rs.players.get(reqSid).side, room, name: rs.players.get(reqSid).name, players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })) });
+          json(res, 200, { sid: reqSid, side: rs.players.get(reqSid).side, room, name: rs.players.get(reqSid).name, players: serializePlayers(rs) });
           return;
         }
         rs.players.set(reqSid, restored);
         scheduleRoomCleanup(rs);
         // 第二人 (恢复后) → 续局通知 (不重置对局)
         if (rs.players.size === 2 && rs.history.length > 0) {
-          setImmediate(() => broadcast(rs, 'start', { players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })) }));
+          setImmediate(() => broadcast(rs, 'start', { players: serializePlayers(rs) }));
         }
-        json(res, 200, { sid: reqSid, side: restored.side, room, name: restored.name, players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })) });
+        json(res, 200, { sid: reqSid, side: restored.side, room, name: restored.name, players: serializePlayers(rs) });
         return;
       }
       // 同名玩家恢复: 房间内记录过角色归属 (退出/超时后重进, 不带 sid 也能恢复原角色)
@@ -302,15 +307,15 @@ async function handleRequest(req, res) {
       rs.players.set(sid, { sid, name, side, stream: null });
       rs.roles[name] = side;   // 记录角色归属
       scheduleRoomCleanup(rs);  // 加入后重排清理 (2 人 → 不再清理)
-      json(res, 200, { sid, side, room, name, players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })) });
+      json(res, 200, { sid, side, room, name, players: serializePlayers(rs) });
       // 第二人加入 → 仅新局才开局 (history 空 且 status=playing 且无人走过); 已有对局则续局不重置
       if (rs.players.size === 2 && rs.history.length === 0 && rs.status === PLAYING && rs.lastMove === null) {
         rs.map = rules.initMap(); rs.turn = RED; rs.history = []; rs.status = PLAYING; rs.check = false; rs.lastMove = null;
         resetClock(rs);
-        setImmediate(() => broadcast(rs, 'start', { players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })) }));
+        setImmediate(() => broadcast(rs, 'start', { players: serializePlayers(rs) }));
       } else if (rs.players.size === 2 && rs.history.length > 0) {
         // 续局: 不重置, 通知两人恢复
-        setImmediate(() => broadcast(rs, 'start', { players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })) }));
+        setImmediate(() => broadcast(rs, 'start', { players: serializePlayers(rs) }));
       }
       return;
     }
@@ -419,7 +424,7 @@ async function handleRequest(req, res) {
       rs.pendingUndo = null;
       if (rs.clockTimer) { clearTimeout(rs.clockTimer); rs.clockTimer = null; }
       resetClock(rs);
-      broadcast(rs, 'start', { players: [...rs.players.values()].map(p => ({ name: p.name, side: p.side })) });
+      broadcast(rs, 'start', { players: serializePlayers(rs) });
       broadcast(rs, 'state', view(rs, 0));
       return json(res, 200, { ok: true });
     }

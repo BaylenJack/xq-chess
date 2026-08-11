@@ -1113,12 +1113,7 @@ button, input, [role="button"], select, textarea {
 }
 
 /* 倒计时 (单计时器: 按钮 + 数字) */
-.timer-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
+/* (旧 .timer-row 已废弃, 现在用 .control-row 容纳所有按钮) */
 /* 倒计时按钮 (紧凑圆形图标按钮) */
 .timer-btn {
   width: 44px; height: 44px;
@@ -1184,9 +1179,34 @@ button, input, [role="button"], select, textarea {
 }
 .timer-btn:active { transform: translateY(0); }
 
+/* 思考按钮行: 单独一行, 居中 */
+.think-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--sp-2);
+}
+.think-btn {
+  flex: 0 0 auto;
+  min-width: 180px;
+  letter-spacing: 4px;
+  font-weight: 600;
+}
+.think-btn svg { width: 16px; height: 16px; opacity: .9; }
+
+/* 控制行: 倒计时 + 悔棋 + 重新开始 三按钮紧凑 */
 .control-row {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+}
+.control-row .ctrl-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 8px 6px;
+  min-height: 40px;
+  font-size: var(--fs-xs);
+  letter-spacing: 1px;
 }
 
 .ctrl-btn {

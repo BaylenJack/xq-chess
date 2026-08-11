@@ -360,6 +360,12 @@
       st.history = s.history;
       st.lastMove = s.lastMove;
       st.players = s.players;
+      // 同步我的角色 (重启互换后必须更新; 旧逻辑忘了, 导致两人都看到同一颜色)
+      const myNew = (s.players || []).find(p => p.sid === mySid);
+      if (myNew && myNew.side !== playerSide) {
+        playerSide = myNew.side;
+        flipped = playerSide === 1;
+      }
       // 倒计时: 服务端权威 (deadline 广播), 两方同步
       if (s.clock) XQ.timer.sync(s.clock.deadline, s.clock.on);
       // 倒计时面板显隐: 服务端广播, 双方同步
@@ -389,6 +395,12 @@
     es.addEventListener('start', ev => {
       const s = JSON.parse(ev.data);
       st.players = s.players;
+      // 同步角色 (重启互换后)
+      const myNew = s.players && s.players.find(p => p.sid === mySid);
+      if (myNew && myNew.side !== playerSide) {
+        playerSide = myNew.side;
+        flipped = playerSide === 1;
+      }
       showModal('对局开始');
       playSound('join');
       // 倒计时随 state 广播同步 (start 事件无 clock, 由紧随的 state 处理)
@@ -530,50 +542,53 @@
     });
   }
 
-  // 思考按钮: 单击/长按双模式 (借鉴移动端 long-press 交互)
+  // 思考按钮: 单击=普通思考 / 长按=升读思考; label 实时切换
   const LONG_PRESS_MS = 600;
   let thinkTimer = null, thinkPressed = false;
   function bindThinkBtn() {
     const btn = $('thinkBtn');
     if (!btn) return;
+    const label = btn.querySelector('.think-label');
+    const setLabel = (text) => { if (label) label.textContent = text; };
     const startThink = (deep) => {
-      if (XQ.thinking) return;   // 已在思考
+      if (XQ.thinking) return;
       XQ.thinking = true;
       btn.classList.add('thinking');
-      // 触发: 走棋方到自己时, 显示提示
+      setLabel(deep ? '升读思考中' : '普通思考中');
       const onTurn = () => {
         if (!XQ.thinking) return;
         if (st.status !== G.STATUS.PLAYING || st.turn !== playerSide) return;
         XQ.ai.startHint(deep ? 'hard' : 'medium', playerSide);
       };
       onTurn();
-      XQ.thinkPoll = setInterval(onTurn, 300);   // 持续检查是否轮到自己
+      XQ.thinkPoll = setInterval(onTurn, 300);
     };
     const endThink = () => {
       XQ.thinking = false;
       clearTimeout(thinkTimer);
       clearInterval(XQ.thinkPoll);
       btn.classList.remove('thinking');
+      setLabel('普通思考');
       XQ.ai.stopHint();
     };
-    // 鼠标 / 触摸通用
     const onDown = (e) => {
       e.preventDefault();
       thinkPressed = true;
       clearTimeout(thinkTimer);
-      thinkTimer = setTimeout(() => { if (thinkPressed) { btn.classList.add('deep'); startThink(true); } }, LONG_PRESS_MS);
+      setLabel('升读思考…');
+      thinkTimer = setTimeout(() => {
+        if (thinkPressed) { btn.classList.add('deep'); startThink(true); setLabel('升读思考中'); }
+      }, LONG_PRESS_MS);
     };
     const onUp = () => {
       if (!thinkPressed) return;
       thinkPressed = false;
       clearTimeout(thinkTimer);
       if (btn.classList.contains('deep')) {
-        // 长按: 已启动深度思考, 松开不立即关, 用户需再次点按钮关闭
         btn.classList.remove('deep');
       } else {
-        // 单击: 普通思考, 触发一次即可
         startThink(false);
-        setTimeout(endThink, 8000);  // 普通思考 8 秒后自动结束
+        setTimeout(endThink, 8000);
       }
     };
     btn.addEventListener('mousedown', onDown);
@@ -582,7 +597,6 @@
     btn.addEventListener('mouseleave', () => { if (thinkPressed && !btn.classList.contains('deep')) endThink(); });
     btn.addEventListener('touchend', onUp);
     btn.addEventListener('touchcancel', endThink);
-    // 再次点击: 关闭
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       if (XQ.thinking) endThink();
