@@ -660,18 +660,23 @@ button, input, [role="button"], select, textarea {
   flex-shrink: 0;
 }
 
-/* ---------- 棋盘舞台 ---------- */
+/* ---------- 棋盘舞台 (画框) ---------- */
 .board-stage {
   position: relative;
   width: min(94vw, 480px);
   padding: var(--sp-3);
   border-radius: var(--r-xl);
-  background: var(--bg-2);
+  /* 画框渐变: 深胡桃木外框 → 内嵌金色 → 棋盘区 */
+  background: linear-gradient(135deg, #1a1008 0%, #2a1810 50%, #1a1008 100%);
+  /* 装裱效果: 外阴影 (画框落地) + 内多描边 (木纹 → 金线 → 棋盘) */
   box-shadow:
-    inset 0 0 0 1px var(--line),
-    inset 0 0 40px rgba(0, 0, 0, .5),
-    inset 0 1px 0 rgba(255, 220, 160, .05),
-    var(--shadow-2);
+    inset 0 0 0 1px rgba(232, 182, 76, .25),   /* 金色细描边 (画框最外) */
+    inset 0 0 0 3px var(--bg-0),                /* 深色嵌线 (胡桃木) */
+    inset 0 0 0 4px rgba(232, 182, 76, .35),    /* 金色细描边 (画框内) */
+    inset 0 0 40px rgba(0, 0, 0, .5),          /* 内阴影 (深邃感) */
+    inset 0 1px 0 rgba(255, 220, 160, .05),    /* 顶部高光 */
+    0 12px 32px rgba(0, 0, 0, .55),            /* 外阴影 (画框悬浮) */
+    0 0 60px rgba(232, 182, 76, .08);          /* 微弱金晕 (氛围) */
   border: 1px solid var(--line-strong);
 }
 
@@ -733,56 +738,61 @@ button, input, [role="button"], select, textarea {
 
 /* 红方翻转已由 JS 数据驱动 (格子 data-r 定位颠倒), 无需 CSS 旋转 */
 
-/* 木纹底 (z 0) — SVG 真实木纹: 纤维 + 木结 + 裂痕 + 暖色基底 */
+/* 木纹底 (z 0) — 细密米色胡桃木纹 (克制, 配深棕网格线精致感) */
 .board-wrap .wood-bg {
   position: absolute;
-  inset: calc(var(--cell) / 2);   /* 外框 = 8×9 格 */
+  inset: calc(var(--cell) / 2);
   border-radius: 4px;
   background:
-    /* 顶部光带 + 底部阴影 (立体感) */
-    linear-gradient(180deg, rgba(255, 230, 180, .08) 0%, transparent 25%, transparent 75%, rgba(0, 0, 0, .18) 100%),
-    /* 木纹 SVG: 5 根竖纤维 (简化) */
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 1000' preserveAspectRatio='none'><defs><filter id='grain'><feTurbulence baseFrequency='0.04 0.5' numOctaves='1' seed='3'/><feColorMatrix values='0 0 0 0 0.18  0 0 0 0 0.08  0 0 0 0 0.03  0 0 0 0.12 0'/></filter></defs><rect width='800' height='1000' fill='%23b07a35'/><rect width='800' height='1000' fill='url(%23g)' filter='url(%23grain)'/><g fill='%235a3d18' opacity='.28'><ellipse cx='220' cy='320' rx='36' ry='20'/><ellipse cx='580' cy='720' rx='48' ry='26'/></g><g fill='%23c89957' opacity='.4'><rect x='150' y='0' width='1' height='1000'/><rect x='320' y='0' width='0.8' height='1000'/><rect x='480' y='0' width='1.2' height='1000'/><rect x='640' y='0' width='0.6' height='1000'/><rect x='740' y='0' width='1' height='1000'/></g></svg>"),
-    /* 兜底色 */
+    /* 顶部柔光 + 底部深邃 (立体雕板) */
+    linear-gradient(180deg, rgba(255, 235, 195, .14) 0%, transparent 30%, transparent 75%, rgba(40, 20, 5, .28) 100%),
+    /* 极细木纹 SVG: 8 根细纤维 + 1 个小木结 (克制) */
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 1000' preserveAspectRatio='none'><defs><filter id='grain'><feTurbulence baseFrequency='0.06 0.55' numOctaves='1' seed='7'/><feColorMatrix values='0 0 0 0 0.28  0 0 0 0 0.15  0 0 0 0 0.06  0 0 0 0.08 0'/></filter></defs><rect width='800' height='1000' fill='%23c89957'/><rect width='800' height='1000' fill='url(%23g)' filter='url(%23grain)'/><g fill='%238a5a26' opacity='.22'><ellipse cx='380' cy='500' rx='28' ry='16'/></g><g fill='%23b07a35' opacity='.32'><rect x='110' y='0' width='0.7' height='1000'/><rect x='225' y='0' width='0.5' height='1000'/><rect x='345' y='0' width='0.8' height='1000'/><rect x='460' y='0' width='0.5' height='1000'/><rect x='580' y='0' width='0.9' height='1000'/><rect x='690' y='0' width='0.5' height='1000'/><rect x='755' y='0' width='0.6' height='1000'/></g></svg>"),
+    /* 兜底色: 暖色木纹 */
     linear-gradient(135deg, var(--wood-light) 0%, var(--wood) 50%, var(--wood-mid) 100%);
   background-size: 100% 100%, 100% 100%, cover;
   box-shadow:
-    inset 0 0 0 1px var(--gold-2),
-    inset 0 0 0 2px var(--wood-edge),
-    inset 0 0 24px rgba(0, 0, 0, .2),
-    inset 0 1px 0 rgba(255, 230, 180, .3),
-    0 4px 12px rgba(0, 0, 0, .35);
+    /* 描金边 (1px) + 深色嵌线 (3px) + 内阴影 (立体) */
+    inset 0 0 0 1px rgba(232, 182, 76, .6),
+    inset 0 0 0 2px rgba(40, 22, 8, .8),
+    inset 0 0 24px rgba(0, 0, 0, .18),
+    inset 0 1px 0 rgba(255, 235, 195, .35),
+    0 6px 16px rgba(0, 0, 0, .4);
   pointer-events: none;
   z-index: 0;
 }
 
-/* 网格线 (z 1, 覆盖在木纹之上) — 用 ::before 画竖线, ::after 画横线 */
+/* 网格线 (z 1, 覆盖在木纹之上) — 深棕线 + 上下加粗, 模拟立体雕槽 */
 .board-wrap .grid-lines {
   position: absolute;
   inset: calc(var(--cell) / 2);
   box-sizing: border-box;
-  /* 精确 8 列 × 9 行: 不随容器膨胀 (避免第 9 条多余竖线) */
   width: calc(var(--cell) * 8);
   height: calc(var(--cell) * 9);
   pointer-events: none;
   z-index: 1;
   background:
-    repeating-linear-gradient(to right, transparent 0, transparent calc(var(--cell) - 1.5px), var(--wood-deep) calc(var(--cell) - 1.5px), var(--wood-deep) var(--cell));
+    repeating-linear-gradient(to right, transparent 0, transparent calc(var(--cell) - 1.2px), #5a3d18 calc(var(--cell) - 1.2px), #5a3d18 var(--cell));
 }
-/* 横线用另一个层避免 background 互相冲掉 */
+/* 横线 */
 .board-wrap .grid-lines::after {
   content: '';
   position: absolute;
   inset: 0;
   background:
-    repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--cell) - 1.5px), var(--wood-deep) calc(var(--cell) - 1.5px), var(--wood-deep) var(--cell));
+    repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--cell) - 1.2px), #5a3d18 calc(var(--cell) - 1.2px), #5a3d18 var(--cell));
 }
-/* 九宫斜线: 由内联 <svg class="palace-diags"> 绘制 (vector-effect 物理像素线宽, 任何 DPR 下与网格线一致) */
+/* 首末行/列加粗 + 加深: 模拟立体雕槽 (外框比内格显眼) */
 .board-wrap .grid-lines::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: none;
+  /* 上下加粗: 第一行 + 第十行 2.5px; 中间 1.2px */
+  background:
+    linear-gradient(to bottom, #2a1a08 0, #2a1a08 2.5px, transparent 2.5px, transparent calc(100% - 2.5px), #2a1a08 calc(100% - 2.5px), #2a1a08 100%),
+    /* 左右加粗: 第一列 + 第十列 2.5px; 中间 1.2px (浅层覆盖, 不破坏细线) */
+    linear-gradient(to right, #2a1a08 0, #2a1a08 2.5px, transparent 2.5px, transparent calc(100% - 2.5px), #2a1a08 calc(100% - 2.5px), #2a1a08 100%);
+  background-blend-mode: normal, normal;
 }
 .board-wrap .palace-diags {
   position: absolute;
@@ -816,14 +826,19 @@ button, input, [role="button"], select, textarea {
 }
 .river {
   font-family: var(--font-serif);
-  font-size: calc(var(--cell) * 0.5);
-  font-weight: bold;
-  color: rgba(60, 38, 16, .8);
-  letter-spacing: calc(var(--cell) * 0.3);
+  font-size: calc(var(--cell) * 0.62);   /* 加大: 0.5 → 0.62 */
+  font-weight: 700;
+  color: #3a1f0a;   /* 深褐, 清晰可见 */
+  letter-spacing: calc(var(--cell) * 0.36);
   text-shadow:
-    0 1px 0 rgba(255, 230, 180, .55),
-    0 -1px 0 rgba(0, 0, 0, .25),
-    0 2px 4px rgba(0, 0, 0, .3);
+    /* 描金边: 上下各 1px 金线 */
+    0 1px 0 rgba(232, 182, 76, .8),
+    0 -1px 0 rgba(232, 182, 76, .8),
+    /* 立体阴影: 顶部高光 + 底部深沉 */
+    0 2px 0 rgba(0, 0, 0, .4),
+    0 -2px 0 rgba(255, 235, 195, .25),
+    /* 远景模糊 */
+    0 3px 6px rgba(0, 0, 0, .25);
 }
 
 /* 格子 (z 3) */
