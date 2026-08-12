@@ -493,7 +493,7 @@
   // 限时迭代加深 (Time-Controlled Iterative Deepening):
   // 从深 3 开始逐层加深, 每层用掉 15s 预算的一部分; 时间到 → 返回已完成的最高层结果
   // 借鉴经典引擎 (pengjiu/ChineseChess AICoreHandler) 的 time-managed 搜索思想
-  const TIME_LIMIT_MS = 10000;   // 深度思考总预算 10s (用户要求 ≤10s)
+  const TIME_LIMIT_MS = 8000;   // 深度思考总预算 8s (用户要求 ≤8s, 不降智能)
   function getBestMove(map, my, depth, randomize) {
     const moves = R.legalMoves(map, my);
     if (moves.length === 0) return null;
@@ -568,6 +568,11 @@
       clearHistory();
       // TT 不清表: 深层复用浅层已算局面 (Zobrist 哈希一致), 提速显著
       sortMoves(moves, map);
+      // PV 走法优先: 上一层 bestMove 排第一 (首走法全窗口命中 → 剪枝率大增)
+      if (bestMove) {
+        const i = moves.findIndex(m => m.fr.r === bestMove.fr.r && m.fr.c === bestMove.fr.c && m.to.r === bestMove.to.r && m.to.c === bestMove.to.c);
+        if (i > 0) { const pv = moves.splice(i, 1)[0]; moves.unshift(pv); }
+      }
       curHash = boardHash(map);
       nodeBudget = 10000000;   // 单层 1000 万节点 (时间截止才是真预算)
 
