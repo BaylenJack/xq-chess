@@ -532,6 +532,20 @@ button, input, [role="button"], select, textarea {
   overflow: hidden;
   transition: all .35s var(--ease-out);
 }
+/* 玩家卡顶部金色细线 (品牌装饰) */
+.player-frame::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 12px;
+  right: 12px;
+  height: 1px;
+  background: linear-gradient(to right,
+    transparent, var(--gold-2) 20%, var(--gold-3) 50%, var(--gold-2) 80%, transparent);
+  opacity: .55;
+  pointer-events: none;
+}
+.player-card.active .player-frame::before { opacity: 1; box-shadow: 0 0 6px var(--gold-glow); }
 .player-card.active .player-frame {
   border-color: var(--gold-3);
   background: linear-gradient(180deg, rgba(60, 45, 25, .85), rgba(40, 28, 16, .85));
@@ -680,30 +694,31 @@ button, input, [role="button"], select, textarea {
   border: 1px solid var(--line-strong);
 }
 
-/* 角花 */
+/* 角花: 双线金色方框 (传统装裱角) */
 .board-corner {
   position: absolute;
-  width: 36px; height: 36px;
+  width: 32px; height: 32px;
   pointer-events: none;
-  opacity: .55;
+  opacity: .8;
 }
 .board-corner::before, .board-corner::after {
   content: '';
   position: absolute;
-  background: linear-gradient(135deg, var(--gold-3), transparent);
+  background: var(--gold-2);
+  box-shadow: 0 0 4px rgba(232, 182, 76, .4);
 }
-.board-corner.tl { top: 4px; left: 4px; }
-.board-corner.tl::before { top: 0; left: 0; width: 16px; height: 1px; }
-.board-corner.tl::after  { top: 0; left: 0; width: 1px; height: 16px; }
-.board-corner.tr { top: 4px; right: 4px; }
-.board-corner.tr::before { top: 0; right: 0; width: 16px; height: 1px; }
-.board-corner.tr::after  { top: 0; right: 0; width: 1px; height: 16px; }
-.board-corner.bl { bottom: 4px; left: 4px; }
-.board-corner.bl::before { bottom: 0; left: 0; width: 16px; height: 1px; }
-.board-corner.bl::after  { bottom: 0; left: 0; width: 1px; height: 16px; }
-.board-corner.br { bottom: 4px; right: 4px; }
-.board-corner.br::before { bottom: 0; right: 0; width: 16px; height: 1px; }
-.board-corner.br::after  { bottom: 0; right: 0; width: 1px; height: 16px; }
+.board-corner.tl { top: 6px; left: 6px; }
+.board-corner.tl::before { top: 0; left: 0; width: 100%; height: 1.5px; }
+.board-corner.tl::after  { top: 0; left: 0; width: 1.5px; height: 100%; }
+.board-corner.tr { top: 6px; right: 6px; }
+.board-corner.tr::before { top: 0; right: 0; width: 100%; height: 1.5px; }
+.board-corner.tr::after  { top: 0; right: 0; width: 1.5px; height: 100%; }
+.board-corner.bl { bottom: 6px; left: 6px; }
+.board-corner.bl::before { bottom: 0; left: 0; width: 100%; height: 1.5px; }
+.board-corner.bl::after  { bottom: 0; left: 0; width: 1.5px; height: 100%; }
+.board-corner.br { bottom: 6px; right: 6px; }
+.board-corner.br::before { bottom: 0; right: 0; width: 100%; height: 1.5px; }
+.board-corner.br::after  { bottom: 0; right: 0; width: 1.5px; height: 100%; }
 
 /* 状态徽章 (浮于棋盘下) */
 .status-pill {
@@ -748,9 +763,11 @@ button, input, [role="button"], select, textarea {
     linear-gradient(180deg, rgba(255, 235, 195, .14) 0%, transparent 30%, transparent 75%, rgba(40, 20, 5, .28) 100%),
     /* 极细木纹 SVG: 8 根细纤维 + 1 个小木结 (克制) */
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 1000' preserveAspectRatio='none'><defs><filter id='grain'><feTurbulence baseFrequency='0.06 0.55' numOctaves='1' seed='7'/><feColorMatrix values='0 0 0 0 0.28  0 0 0 0 0.15  0 0 0 0 0.06  0 0 0 0.08 0'/></filter></defs><rect width='800' height='1000' fill='%23c89957'/><rect width='800' height='1000' fill='url(%23g)' filter='url(%23grain)'/><g fill='%238a5a26' opacity='.22'><ellipse cx='380' cy='500' rx='28' ry='16'/></g><g fill='%23b07a35' opacity='.32'><rect x='110' y='0' width='0.7' height='1000'/><rect x='225' y='0' width='0.5' height='1000'/><rect x='345' y='0' width='0.8' height='1000'/><rect x='460' y='0' width='0.5' height='1000'/><rect x='580' y='0' width='0.9' height='1000'/><rect x='690' y='0' width='0.5' height='1000'/><rect x='755' y='0' width='0.6' height='1000'/></g></svg>"),
+    /* 九宫区域底色稍深 (传统棋盘: 中心 2×3 格加深, 模拟棋盘材质分区) */
+    radial-gradient(circle at 50% 50%, transparent 19%, transparent 21%, rgba(60, 30, 10, .14) 22%, transparent 25%),
     /* 兜底色: 暖色木纹 */
     linear-gradient(135deg, var(--wood-light) 0%, var(--wood) 50%, var(--wood-mid) 100%);
-  background-size: 100% 100%, 100% 100%, cover;
+  background-size: 100% 100%, 100% 100%, 100% 100%, cover;
   box-shadow:
     /* 描金边 (1px) + 深色嵌线 (3px) + 内阴影 (立体) */
     inset 0 0 0 1px rgba(232, 182, 76, .6),
