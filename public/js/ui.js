@@ -92,8 +92,8 @@
   function logicR(vr) { return flipped ? 9 - vr : vr; }
 
   function buildBoard() {
-    const wrap = $('board');
-    boardEl = el('div', 'board-wrap');
+    // #board 本身就是 board-wrap (game.html 静态定义), 直接往它里面放各层
+    boardEl = $('board');
     // 木纹底
     boardEl.appendChild(el('div', 'wood-bg'));
     // 网格线
@@ -132,16 +132,18 @@
         boardEl.appendChild(cell);
       }
     }
-    wrap.appendChild(boardEl);
     // 关键! 显式计算并设置 --cell (像素值), 避免嵌套 calc 失效
+    // 让 wrap 宽度严格 = 9 × cell (棋盘 8 格 + 两侧各半格边距), 保证各层精确对齐
     const boardW = boardEl.getBoundingClientRect().width;
     const cellPx = Math.max(30, Math.floor(boardW / 9));
     boardEl.style.setProperty('--cell', cellPx + 'px');
+    boardEl.style.width = (cellPx * 9) + 'px';   // 回写, 消除 454≠450 的 4px 误差
     // 棋盘大小变化时重设 (ResizeObserver + resize 兜底, 覆盖安卓 WebView 不触发 RO 的情况)
     const recomputeCell = () => {
       const w = boardEl.getBoundingClientRect().width;
       const c = Math.max(30, Math.floor(w / 9));
       boardEl.style.setProperty('--cell', c + 'px');
+      boardEl.style.width = (c * 9) + 'px';
     };
     if (typeof ResizeObserver !== 'undefined') {
       new ResizeObserver(recomputeCell).observe(boardEl);

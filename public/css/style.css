@@ -736,7 +736,7 @@ button, input, [role="button"], select, textarea {
 /* 木纹底 (z 0) — SVG 真实木纹: 纤维 + 木结 + 裂痕 + 暖色基底 */
 .board-wrap .wood-bg {
   position: absolute;
-  inset: calc(var(--cell) / 2);
+  inset: calc(var(--cell) / 2);   /* 外框 = 8×9 格 */
   border-radius: 4px;
   background:
     /* 顶部光带 + 底部阴影 (立体感) */
@@ -746,7 +746,6 @@ button, input, [role="button"], select, textarea {
     /* 兜底色 */
     linear-gradient(135deg, var(--wood-light) 0%, var(--wood) 50%, var(--wood-mid) 100%);
   background-size: 100% 100%, 100% 100%, cover;
-  border: 1px solid var(--wood-deep);
   box-shadow:
     inset 0 0 0 1px var(--gold-2),
     inset 0 0 0 2px var(--wood-edge),
@@ -761,6 +760,10 @@ button, input, [role="button"], select, textarea {
 .board-wrap .grid-lines {
   position: absolute;
   inset: calc(var(--cell) / 2);
+  box-sizing: border-box;
+  /* 精确 8 列 × 9 行: 不随容器膨胀 (避免第 9 条多余竖线) */
+  width: calc(var(--cell) * 8);
+  height: calc(var(--cell) * 9);
   pointer-events: none;
   z-index: 1;
   background:
@@ -795,9 +798,10 @@ button, input, [role="button"], select, textarea {
 .board-wrap .river-band {
   position: absolute;
   left: calc(var(--cell) / 2);
-  right: calc(var(--cell) / 2);
   top: calc(50% - var(--cell) / 2);
+  width: calc(var(--cell) * 8);   /* 精确 8 列, 与网格对齐 */
   height: var(--cell);
+  box-sizing: border-box;
   background: linear-gradient(180deg,
     var(--wood-light) 0%,
     var(--wood) 50%,
