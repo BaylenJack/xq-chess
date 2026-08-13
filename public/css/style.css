@@ -1574,6 +1574,64 @@ button, input, [role="button"], select, textarea {
 .modal-card::before { top: 8px; left: 8px; border-top: 1px solid var(--gold-3); border-left: 1px solid var(--gold-3); }
 .modal-card::after { bottom: 8px; right: 8px; border-bottom: 1px solid var(--gold-3); border-right: 1px solid var(--gold-3); }
 
+/* 确认模态 */
+.confirm-card {
+  min-width: min(80vw, 320px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  letter-spacing: 2px;
+}
+.confirm-title { font-size: var(--fs-lg); color: var(--gold-4); }
+.confirm-sub { font-size: var(--fs-sm); color: var(--ink-2); letter-spacing: 1px; }
+.confirm-actions { display: flex; gap: 12px; width: 100%; margin-top: 4px; }
+.confirm-actions .ctrl-btn { flex: 1; }
+.ctrl-btn.primary {
+  color: var(--wood-edge);
+  font-weight: 600;
+  background: linear-gradient(180deg, var(--gold-4) 0%, var(--gold-3) 50%, var(--gold-2) 100%);
+  border-color: var(--gold-2);
+}
+.ctrl-btn.primary:hover {
+  background: linear-gradient(180deg, var(--gold-5) 0%, var(--gold-4) 50%, var(--gold-3) 100%);
+  box-shadow: var(--shadow-2), 0 0 14px rgba(232, 182, 76, .4);
+}
+/* 倒计时环 */
+.confirm-ring {
+  position: relative;
+  width: 48px; height: 48px;
+  display: flex; align-items: center; justify-content: center;
+}
+.confirm-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.confirm-ring .ring-bg { fill: none; stroke: rgba(232, 182, 76, .15); stroke-width: 2.5; }
+.confirm-ring .ring-fg {
+  fill: none; stroke: var(--gold-3); stroke-width: 2.5; stroke-linecap: round;
+  transition: stroke-dashoffset .25s linear;
+}
+.ring-num { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--gold-3); }
+
+/* 胜负结算面板 */
+.result-card {
+  min-width: min(84vw, 340px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.result-kicker {
+  font-size: var(--fs-xs); letter-spacing: 4px; color: var(--ink-2);
+  border: 1px solid var(--line-strong); border-radius: var(--r-pill); padding: 3px 14px;
+}
+.result-title {
+  font-size: var(--fs-xl); letter-spacing: 10px; color: var(--gold-4);
+  text-shadow: 0 0 24px rgba(232, 182, 76, .35);
+  margin-left: 10px;   /* 补偿 letter-spacing 视觉居中 */
+}
+.result-sub { font-size: var(--fs-sm); color: var(--ink-1); letter-spacing: 2px; }
+.result-actions { display: flex; gap: 12px; width: 100%; margin-top: 6px; }
+.result-actions .ctrl-btn { flex: 1; }
+
 /* ============================================================
    移动端
    ============================================================ */

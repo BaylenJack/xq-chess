@@ -74,10 +74,41 @@
       <button id="undoBtn" class="ctrl-btn">悔棋</button>
       <button id="restartBtn" class="ctrl-btn">重新开始</button>
     </div>
-    <div id="undoRequestModal" class="modal hidden"><div class="modal-card">等待对方确认悔棋…</div></div>
   </footer>
 
   <div id="modal" class="modal"><div class="modal-card"></div></div>
+
+  <!-- 通用确认模态 (替代原生 confirm) -->
+  <div id="confirmModal" class="modal">
+    <div class="modal-card confirm-card">
+      <div class="confirm-title" id="confirmTitle"></div>
+      <div class="confirm-sub hidden" id="confirmSub"></div>
+      <div class="confirm-ring hidden" id="confirmRing">
+        <svg viewBox="0 0 40 40" aria-hidden="true">
+          <circle class="ring-bg" cx="20" cy="20" r="17"/>
+          <circle class="ring-fg" id="ringFg" cx="20" cy="20" r="17"/>
+        </svg>
+        <span class="ring-num" id="ringNum">30</span>
+      </div>
+      <div class="confirm-actions" id="confirmActions">
+        <button id="confirmCancel" class="ctrl-btn">取消</button>
+        <button id="confirmOk" class="ctrl-btn primary">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 胜负结算面板 -->
+  <div id="resultModal" class="modal">
+    <div class="modal-card result-card">
+      <div class="result-kicker" id="resultReason"></div>
+      <div class="result-title" id="resultTitle"></div>
+      <div class="result-sub" id="resultSub"></div>
+      <div class="result-actions">
+        <button id="resultRestart" class="ctrl-btn primary">再来一局</button>
+        <button id="resultHome" class="ctrl-btn">回大厅</button>
+      </div>
+    </div>
+  </div>
 
   <script src="/js/rules.js?v=37"></script>
   <script src="/js/ai.js?v=37"></script>

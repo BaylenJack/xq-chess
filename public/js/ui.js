@@ -350,6 +350,7 @@
           if (cell.pieceEl) { cell.pieceEl.remove(); cell.pieceEl = null; }
         }
       }
+      endedShown = false;
       render();
       connectStream();
       if (data.players.length >= 2) playSound('join');
@@ -399,20 +400,15 @@
       if (typeof XQ.applyClockVisible === 'function') XQ.applyClockVisible(s.clockVisible);
       if (last) playSound(last.captured ? 'capture' : 'move');
       if (s.check) playSound('check');
-      if (s.status !== 'playing') {
-        playSound(s.status === 'red_win' ? 'win' : 'lose');
-        // 仅在超时/有人离开时弹窗; 普通胜负由状态徽章 + 走子音效提示即可
-        if (s.reason === 'timeout') {
-          showModal(s.winner === mySid ? '🎉 对方超时 · 你赢了' : '⏰ 超时判负');
-        } else if (s.reason === 'peer_left') {
-          showModal('🎉 对手离开 · 你赢了');
-        }
-        XQ.timer.disable();
-      } else if (last) {
-        // 对方走子 → server 已重置 deadline, 上面的 sync 已同步
-      }
       selected = null; legalNow = []; illegalNow = []; clearHint();
       updateRecord();
+      closeConfirmByKind('undo-wait');
+      closeConfirmByKind('undo-ask');
+      if (s.status !== 'playing' && !endedShown) {
+        endedShown = true;
+        XQ.timer.disable();
+        showResult(s);
+      }
       render();
       // 走子动画: 原位置光点 + 落子环绕发光 (渲染后)
       if (animMove) {
@@ -432,6 +428,8 @@
       showModal('对局开始');
       playSound('join');
       // 倒计时随 state 广播同步 (start 事件无 clock, 由紧随的 state 处理)
+      endedShown = false;
+      $('resultModal').classList.remove('show');
       render();
     });
     es.addEventListener('peer_left', ev => {
@@ -441,15 +439,19 @@
     // 悔棋请求: 弹窗询问对方 (非请求方)
     es.addEventListener('undo_request', async ev => {
       const s = JSON.parse(ev.data);
-      if (s.requester === mySid) return;   // 自己提的: 已在 showUndoPending
-      const ok = await askUndoConfirm();
-      api(ok ? 'undo-confirm' : 'undo-reject', { room: myRoom, sid: mySid })
+      if (s.requester === mySid) return;   // 自己提的: 已在 undo-wait 模态
+      const ans = await showConfirm({ kind: 'undo-ask', title: '对方请求悔棋', sub: '是否同意?', okText: '同意', cancelText: '拒绝', timeoutSec: 30 });
+      if (ans === null) return;   // 超时/静默关闭: 不回应 (服务端 30s 自动清理)
+      api(ans ? 'undo-confirm' : 'undo-reject', { room: myRoom, sid: mySid })
         .catch(e => showModal(e.message));
     });
     // 悔棋被拒
-    es.addEventListener('undo_rejected', () => {
-      hideUndoPending();
-      showModal('对方拒绝了你的悔棋请求');
+    es.addEventListener('undo_rejected', ev => {
+      closeConfirmByKind('undo-wait');
+      closeConfirmByKind('undo-ask');
+      let timeout = false;
+      try { timeout = !!(JSON.parse(ev.data) || {}).timeout; } catch (e) {}
+      showModal(timeout ? '悔棋请求超时' : '对方拒绝了你的悔棋请求');
     });
     es.addEventListener('error', () => {
       // EventSource 断线: 显示断线状态 (会自动重连, 重连后 server 推送最新 state)
@@ -563,25 +565,25 @@
     // 思考按钮: 单击=普通(深 4 / 6s), 长按=深度(深 10 / 15s)
     bindThinkBtn();
 
-    // 悔棋: 发起请求 → 等待对方同意/拒绝
-    $('undoBtn').addEventListener('click', () => {
+    // 悔棋: 发起请求 → 等待模态 (30s 倒计时环, 服务端超时自动清理)
+    $('undoBtn').addEventListener('click', async () => {
       ensureAudio();
-      api('undo', { room: myRoom, sid: mySid })
-        .then(res => {
-          if (res.pending) {
-            showUndoPending();   // 显示"等待对方确认"模态
-          } else if (res.auto) {
-            showModal('已悔棋');
-          }
-        })
-        .catch(e => showModal(e.message));
+      try {
+        const res = await api('undo', { room: myRoom, sid: mySid });
+        if (res.pending) {
+          showConfirm({ kind: 'undo-wait', title: '已请求悔棋', sub: '等待对方确认…', timeoutSec: 30, hideActions: true });
+        } else if (res.auto) {
+          showModal('已悔棋');
+        }
+      } catch (e) { showModal(e.message); }
     });
 
-    // 重新开始: 双方互换颜色 + 交换先手 (服务端处理)
-    $('restartBtn').addEventListener('click', () => {
-      if (!confirm('重新开始?双方将互换棋色和先手')) return;
-      api('restart', { room: myRoom, sid: mySid })
-        .catch(e => showModal(e.message));
+    // 重新开始: 确认模态 → 双方互换颜色 + 交换先手 (服务端处理)
+    $('restartBtn').addEventListener('click', async () => {
+      ensureAudio();
+      const ok = await showConfirm({ kind: 'restart', title: '重新开始', sub: '双方将互换棋色和先手', okText: '确定重开' });
+      if (!ok) return;
+      api('restart', { room: myRoom, sid: mySid }).catch(e => showModal(e.message));
     });
 
     // 倒计时面板显隐 (服务端广播)
@@ -598,6 +600,16 @@
       playSound('timeout');
       api('timeout', { room: myRoom, sid: mySid }).catch(() => {});
     });
+
+    // 确认模态按钮
+    $('confirmOk').addEventListener('click', () => resolveConfirm(true));
+    $('confirmCancel').addEventListener('click', () => resolveConfirm(false));
+    // 结算面板按钮
+    $('resultRestart').addEventListener('click', () => {
+      $('resultModal').classList.remove('show');
+      api('restart', { room: myRoom, sid: mySid }).catch(e => showModal(e.message));
+    });
+    $('resultHome').addEventListener('click', () => { location.href = '/'; });
   }
 
   // 思考按钮: 单击开启/关闭深度思考
@@ -634,32 +646,82 @@
     });
   }
 
-  function showUndoPending() {
-    const m = document.getElementById('undoRequestModal');
-    if (!m) return;
-    m.classList.remove('hidden');
-    setTimeout(() => {
-      if (!m.classList.contains('hidden')) {
-        m.classList.add('hidden');
-        showModal('悔棋请求超时, 请重试');
-      }
-    }, 30000);
-  }
-  function hideUndoPending() { document.getElementById('undoRequestModal')?.classList.add('hidden'); }
-
-  // 悔棋协商 UI: 对方请求时弹窗询问
-  function askUndoConfirm() {
-    return new Promise((resolve) => {
-      const yes = confirm('对方请求悔棋,是否同意?');
-      resolve(yes);
-    });
-  }
-
   function showModal(text) {
     const m = $('modal');
     m.querySelector('.modal-card').textContent = text;
     m.classList.add('show');
     setTimeout(() => m.classList.remove('show'), 3200);
+  }
+
+  // ---- 确认模态 (替代原生 confirm) ----
+  // resolve: true=确定, false=取消, null=超时/被外部静默关闭
+  let confirmState = null;   // { resolve, kind, ringTimer }
+  const RING_C = 2 * Math.PI * 17;
+
+  function resolveConfirm(v) {
+    if (!confirmState) return;
+    const { resolve, ringTimer } = confirmState;
+    if (ringTimer) clearInterval(ringTimer);
+    confirmState = null;
+    $('confirmModal').classList.remove('show');
+    resolve(v);
+  }
+  // 按 kind 静默关闭 (state/undo_rejected 到达时)
+  function closeConfirmByKind(kind) {
+    if (confirmState && confirmState.kind === kind) resolveConfirm(null);
+  }
+
+  function showConfirm(opts) {
+    // 已有一个开着: 直接以 null 结掉 (新的优先)
+    if (confirmState) resolveConfirm(null);
+    return new Promise(resolve => {
+      $('confirmTitle').textContent = opts.title || '';
+      const subEl = $('confirmSub');
+      if (opts.sub) { subEl.textContent = opts.sub; subEl.classList.remove('hidden'); }
+      else subEl.classList.add('hidden');
+      $('confirmOk').textContent = opts.okText || '确定';
+      $('confirmCancel').textContent = opts.cancelText || '取消';
+      $('confirmActions').classList.toggle('hidden', !!opts.hideActions);
+      const ringWrap = $('confirmRing');
+      const ringFg = $('ringFg');
+      ringFg.style.strokeDasharray = String(RING_C);
+      let ringTimer = null;
+      if (opts.timeoutSec) {
+        ringWrap.classList.remove('hidden');
+        const end = Date.now() + opts.timeoutSec * 1000;
+        const tick = () => {
+          const left = end - Date.now();
+          if (left <= 0) { resolveConfirm(null); return; }
+          $('ringNum').textContent = String(Math.ceil(left / 1000));
+          ringFg.style.strokeDashoffset = String(RING_C * (1 - left / (opts.timeoutSec * 1000)));
+        };
+        tick();
+        ringTimer = setInterval(tick, 250);
+      } else {
+        ringWrap.classList.add('hidden');
+      }
+      confirmState = { resolve, kind: opts.kind || '', ringTimer };
+      $('confirmModal').classList.add('show');
+    });
+  }
+
+  // ---- 胜负结算面板 ----
+  let endedShown = false;
+  function showResult(s) {
+    const redWin = s.status === 'red_win';
+    const iWon = (redWin ? 1 : -1) === playerSide;
+    $('resultTitle').textContent = redWin ? '红方胜' : '黑方胜';
+    $('resultSub').textContent = iWon ? '恭喜,你赢了这局' : '惜败,再接再厉';
+    let reason;
+    if (s.reason === 'timeout') reason = iWon ? '对方超时' : '超时判负';
+    else if (s.reason === 'peer_left') reason = '对手离开';
+    else {
+      const loser = redWin ? -1 : 1;
+      reason = R.inCheck(s.map, loser) ? '将死制胜' : '困毙制胜';
+    }
+    $('resultReason').textContent = reason;
+    $('resultModal').classList.add('show');
+    playSound(iWon ? 'win' : 'lose');
   }
 
   const ui = {
