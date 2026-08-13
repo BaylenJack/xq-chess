@@ -37,6 +37,17 @@
     </div>
   </header>
 
+  <div class="room-bar">
+    <button id="roomBadge" class="room-badge" title="复制邀请链接" aria-label="复制邀请链接">
+      <span class="room-label">房</span>
+      <span id="roomName" class="room-name">…</span>
+      <svg class="copy-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="9" y="9" width="11" height="11" rx="2"/>
+        <path d="M5 15V5a2 2 0 0 1 2-2h10"/>
+      </svg>
+    </button>
+  </div>
+
   <section class="board-stage">
     <div class="board-corner tl" aria-hidden="true"></div>
     <div class="board-corner tr" aria-hidden="true"></div>
@@ -44,6 +55,15 @@
     <div class="board-corner br" aria-hidden="true"></div>
 
     <div id="board" class="board-wrap" aria-label="棋盘"></div>
+
+    <div id="waitOverlay" class="wait-overlay hidden">
+      <div class="wait-card">
+        <div class="wait-title">虚位以待</div>
+        <div class="wait-room" id="waitRoom"></div>
+        <button id="waitCopyBtn" class="wait-copy">复制邀请链接</button>
+        <div class="wait-sub">朋友进入同一房间即可开局</div>
+      </div>
+    </div>
 
     <div id="status" class="status-pill">进入房间中…</div>
   </section>

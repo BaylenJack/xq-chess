@@ -674,6 +674,39 @@ button, input, [role="button"], select, textarea {
   flex-shrink: 0;
 }
 
+/* ---------- 房间徽章 ---------- */
+.room-bar {
+  position: relative;
+  z-index: 1;
+  width: min(96vw, 560px);
+  display: flex;
+  justify-content: center;
+  margin-top: -6px;   /* 贴紧玩家条 (game-body gap 14px) */
+}
+.room-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px;
+  border-radius: var(--r-pill);
+  background: rgba(0, 0, 0, .35);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: var(--fs-xs);
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: border-color var(--dur-base), color var(--dur-base), box-shadow var(--dur-base);
+}
+.room-badge:hover {
+  border-color: var(--gold-2);
+  color: var(--ink-1);
+  box-shadow: 0 0 10px rgba(232, 182, 76, .15);
+}
+.room-badge .room-label { color: var(--gold-3); font-family: var(--font-serif); letter-spacing: 2px; }
+.room-badge .room-name { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-badge .copy-ico { width: 12px; height: 12px; opacity: .7; flex-shrink: 0; }
+
 /* ---------- 棋盘舞台 (画框) ---------- */
 .board-stage {
   position: relative;
@@ -741,6 +774,59 @@ button, input, [role="button"], select, textarea {
     0 0 14px rgba(232, 182, 76, .25);
   z-index: 2;
 }
+
+/* ---------- 等待空态 ---------- */
+.wait-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 5, 3, .78);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  border-radius: inherit;
+}
+.wait-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: var(--sp-5);
+  text-align: center;
+}
+.wait-title {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+  letter-spacing: 8px;
+  color: var(--gold-4);
+  text-shadow: 0 0 18px rgba(232, 182, 76, .3);
+  margin-left: 8px;
+}
+.wait-room {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  letter-spacing: 2px;
+  color: var(--ink-2);
+}
+.wait-copy {
+  padding: 10px 22px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-serif);
+  font-size: var(--fs-sm);
+  letter-spacing: 3px;
+  color: var(--wood-edge);
+  background: linear-gradient(180deg, var(--gold-4), var(--gold-2));
+  border: 1px solid var(--gold-2);
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(232, 182, 76, .3);
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+  min-height: 44px;
+}
+.wait-copy:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(232, 182, 76, .45); }
+.wait-copy:active { transform: translateY(0); }
+.wait-sub { font-size: var(--fs-xs); color: var(--ink-3); letter-spacing: 1px; }
 
 /* ---------- 棋盘 ---------- */
 .board-wrap {
@@ -1692,6 +1778,7 @@ body.lite .cell.legal .legal-dot::after { animation: none; }
 body.lite .piece { animation: none; }
 body.lite .piece.landed { animation: none; }
 body.lite .timer-num { animation: none; }
+body.lite .wait-overlay { backdrop-filter: none; -webkit-backdrop-filter: none; }
 
 /* ============================================================
    隐藏工具

@@ -313,6 +313,36 @@
     if (hintMove) { hintMove = null; render(); }
   }
 
+  // ---- 邀请链接 ----
+  function inviteUrl() { return `${location.origin}/?room=${encodeURIComponent(myRoom || '')}`; }
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) { /* 降级 */ }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    } catch (e) { return false; }
+  }
+  async function copyInvite() {
+    const ok = await copyText(inviteUrl());
+    showModal(ok ? '已复制邀请链接' : '复制失败,请手动复制地址');
+  }
+  function toggleWaitOverlay(show) {
+    const ov = $('waitOverlay');
+    if (ov) ov.classList.toggle('hidden', !show);
+  }
+
   async function api(path, body) {
     const r = await fetch(`/api/${path}`, {
       method: 'POST',
@@ -330,6 +360,8 @@
     const name = q.get('name') || '棋友';
     if (!room) { location.href = '/'; return; }
     myRoom = room;
+    $('roomName').textContent = room;
+    $('waitRoom').textContent = `房间 · ${room}`;
     try {
       // 复用上次的 sid (退出重进 → 服务端 60s 内恢复原玩家, 续对局不重置)
       const savedSid = localStorage.getItem('xq-sid:' + room);
@@ -351,6 +383,7 @@
         }
       }
       endedShown = false;
+      toggleWaitOverlay(data.players.length < 2);
       render();
       connectStream();
       if (data.players.length >= 2) playSound('join');
@@ -402,6 +435,7 @@
       if (s.check) playSound('check');
       selected = null; legalNow = []; illegalNow = []; clearHint();
       updateRecord();
+      toggleWaitOverlay((s.players || []).length < 2);
       closeConfirmByKind('undo-wait');
       closeConfirmByKind('undo-ask');
       if (s.status !== 'playing' && !endedShown) {
@@ -431,6 +465,7 @@
       if (confirmState) resolveConfirm(null);   // 重开后所有确认模态均已过期
       endedShown = false;
       $('resultModal').classList.remove('show');
+      toggleWaitOverlay((s.players || []).length < 2);
       render();
     });
     es.addEventListener('peer_left', ev => {
@@ -612,6 +647,12 @@
       api('restart', { room: myRoom, sid: mySid }).catch(e => showModal(e.message));
     });
     $('resultHome').addEventListener('click', () => { location.href = '/'; });
+
+    // 邀请链接复制
+    const roomBadge = document.getElementById('roomBadge');
+    if (roomBadge) roomBadge.addEventListener('click', () => { ensureAudio(); copyInvite(); playSound('select'); });
+    const waitCopy = document.getElementById('waitCopyBtn');
+    if (waitCopy) waitCopy.addEventListener('click', () => { ensureAudio(); copyInvite(); playSound('select'); });
   }
 
   // 思考按钮: 单击开启/关闭深度思考

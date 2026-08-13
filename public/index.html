@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>对弈 · 中国象棋</title>
-  <link rel="stylesheet" href="/css/style.css?v=11">
+  <link rel="stylesheet" href="/css/style.css?v=45">
 </head>
 <body class="lobby-body">
 
@@ -102,6 +102,11 @@
         if (savedName && nameInput.value === '') nameInput.value = savedName;
         if (savedRoom && roomInput.value === '') roomInput.value = savedRoom;
       } catch (e) { /* localStorage 不可用忽略 */ }
+      // 邀请链接带房间名: 优先预填 (?room=)
+      try {
+        var urlRoom = new URLSearchParams(location.search).get('room');
+        if (urlRoom) roomInput.value = urlRoom.slice(0, 20);
+      } catch (e) { /* 忽略 */ }
       var showError = function (text) {
         var m = document.getElementById('modal');
         m.querySelector('.modal-card').textContent = text;
