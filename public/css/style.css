@@ -676,8 +676,6 @@ button, input, [role="button"], select, textarea {
 
 /* ---------- 房间徽章 ---------- */
 .room-bar {
-  position: relative;
-  z-index: 1;
   width: min(96vw, 560px);
   display: flex;
   justify-content: center;

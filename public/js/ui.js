@@ -322,17 +322,17 @@
         return true;
       }
     } catch (e) { /* 降级 */ }
+    let ta = null;
     try {
-      const ta = document.createElement('textarea');
+      ta = document.createElement('textarea');
       ta.value = text;
       ta.style.position = 'fixed';
       ta.style.opacity = '0';
       document.body.appendChild(ta);
       ta.select();
-      const ok = document.execCommand('copy');
-      ta.remove();
-      return ok;
+      return document.execCommand('copy');
     } catch (e) { return false; }
+    finally { if (ta) ta.remove(); }
   }
   async function copyInvite() {
     const ok = await copyText(inviteUrl());
@@ -459,6 +459,7 @@
         playerSide = myNew.side;
         flipped = playerSide === 1;
       }
+      $('status').textContent = '对局开始';
       showModal('对局开始');
       playSound('join');
       // 倒计时随 state 广播同步 (start 事件无 clock, 由紧随的 state 处理)
