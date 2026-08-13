@@ -1179,7 +1179,7 @@ button, input, [role="button"], select, textarea {
   position: relative;
   z-index: 1;
   width: min(94vw, 480px);
-  margin-top: 20px;   /* 让出 status-pill 的溢出空间 */
+  margin-top: 6px;   /* 让出 status-pill 的溢出空间 */
   border: 1px solid var(--line-strong);
   border-radius: var(--r-md);
   background: linear-gradient(180deg, rgba(46, 36, 24, .75), rgba(28, 18, 10, .75));

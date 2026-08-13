@@ -261,7 +261,7 @@
     const lastEl = $('recordLast');
     if (lastEl) {
       const last = recs[recs.length - 1];
-      lastEl.textContent = last ? `${last.seq}. ${last.text}` : '暂无着法';
+      lastEl.textContent = last ? `${Math.ceil(last.seq / 2)}. ${last.text}` : '暂无着法';
     }
     const body = $('recordBody');
     if (!body) return;
@@ -270,11 +270,11 @@
       const a = recs[i], b = recs[i + 1];
       const row = el('div', 'record-row');
       row.appendChild(el('span', 'rec-seq', String(i / 2 + 1)));
-      row.appendChild(el('span', 'rec rec-red', a.text));
-      row.appendChild(el('span', 'rec rec-black', b ? b.text : ''));
+      row.appendChild(el('span', 'rec-red', a.text));
+      row.appendChild(el('span', 'rec-black', b ? b.text : ''));
       body.appendChild(row);
     }
-    body.scrollTop = body.scrollHeight;   // 新着自动滚到底 (收起时 scrollTop 无效, 无副作用)
+    body.scrollTop = body.scrollHeight;   // 新着自动滚到底 (收起时不可见, 展开时会重新滚到底)
   }
 
   function onCellClick(r, c) {
@@ -479,6 +479,7 @@
     if (!res.ok) return;
     selected = null; legalNow = []; illegalNow = [];
     render();
+    updateRecord();
     // 本地走子也触发过渡动画 (乐观更新, 服务端 state 回来时 newMoves=0 不重复触发)
     animateMove({ from: mv.fr, to: mv.to, piece: mv.piece, captured: !!mv.captured });
     api('move', { room: myRoom, sid: mySid, mv: { fr: mv.fr, to: mv.to } })
@@ -546,6 +547,7 @@
           const body = document.getElementById('recordBody');
           if (body) body.scrollTop = body.scrollHeight;
         }
+        ensureAudio();
         playSound('select');
       });
     }
