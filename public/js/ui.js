@@ -668,6 +668,7 @@
       XQ.thinking = true;
       btn.classList.add('thinking');
       setLabel('思考中');
+      btn.setAttribute('aria-pressed', 'true');
       const onTurn = () => {
         if (!XQ.thinking) return;
         if (st.status !== G.STATUS.PLAYING || st.turn !== playerSide) return;
@@ -681,6 +682,7 @@
       clearInterval(XQ.thinkPoll);
       btn.classList.remove('thinking');
       setLabel('深度思考');
+      btn.setAttribute('aria-pressed', 'false');
       XQ.ai.stopHint();
     };
     btn.addEventListener('click', (e) => {
