@@ -255,6 +255,28 @@
     $('undoBtn').disabled = st.history.length === 0;
   }
 
+  // ---- 棋谱面板 ----
+  function updateRecord() {
+    const recs = (root.XQ.notation && st.history) ? root.XQ.notation.toRecord(st.history) : [];
+    const lastEl = $('recordLast');
+    if (lastEl) {
+      const last = recs[recs.length - 1];
+      lastEl.textContent = last ? `${last.seq}. ${last.text}` : '暂无着法';
+    }
+    const body = $('recordBody');
+    if (!body) return;
+    body.innerHTML = '';
+    for (let i = 0; i < recs.length; i += 2) {
+      const a = recs[i], b = recs[i + 1];
+      const row = el('div', 'record-row');
+      row.appendChild(el('span', 'rec-seq', String(i / 2 + 1)));
+      row.appendChild(el('span', 'rec rec-red', a.text));
+      row.appendChild(el('span', 'rec rec-black', b ? b.text : ''));
+      body.appendChild(row);
+    }
+    body.scrollTop = body.scrollHeight;   // 新着自动滚到底 (收起时 scrollTop 无效, 无副作用)
+  }
+
   function onCellClick(r, c) {
     ensureAudio();
     if (st.status !== G.STATUS.PLAYING) return;
@@ -318,6 +340,7 @@
       flipped = playerSide === 1;
       st = G.create();
       st.players = data.players;
+      updateRecord();
       applyOnlineStatus(data.players);
       $('status').textContent = data.players.length < 2 ? '等待朋友加入…' : '对局开始';
       // 清空棋盘所有棋子 (消除 init 阶段 flipped=false 的旧渲染), 再按正确视角渲染
@@ -389,6 +412,7 @@
         // 对方走子 → server 已重置 deadline, 上面的 sync 已同步
       }
       selected = null; legalNow = []; illegalNow = []; clearHint();
+      updateRecord();
       render();
       // 走子动画: 原位置光点 + 落子环绕发光 (渲染后)
       if (animMove) {
@@ -511,6 +535,20 @@
   }
 
   function bindControls() {
+    // 棋谱面板折叠
+    const recordHead = document.getElementById('recordHead');
+    if (recordHead) {
+      recordHead.addEventListener('click', () => {
+        const panel = document.getElementById('recordPanel');
+        const open = panel.classList.toggle('open');
+        recordHead.setAttribute('aria-expanded', String(open));
+        if (open) {
+          const body = document.getElementById('recordBody');
+          if (body) body.scrollTop = body.scrollHeight;
+        }
+        playSound('select');
+      });
+    }
     // 倒计时按钮: 开关走服务端广播, 双方同步显隐
     const timerBtn = document.getElementById('timerBtn');
     if (timerBtn) {

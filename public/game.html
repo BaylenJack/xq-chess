@@ -48,6 +48,15 @@
     <div id="status" class="status-pill">进入房间中…</div>
   </section>
 
+  <section id="recordPanel" class="record-panel">
+    <button id="recordHead" class="record-head" aria-expanded="false" aria-label="展开/收起棋谱">
+      <span class="record-title">棋谱</span>
+      <span id="recordLast" class="record-last">暂无着法</span>
+      <span class="record-arrow" aria-hidden="true">▾</span>
+    </button>
+    <div id="recordBody" class="record-body"></div>
+  </section>
+
   <footer class="game-controls">
     <div class="think-row">
       <button id="thinkBtn" class="ctrl-btn think-btn" aria-label="单击开启/关闭深度思考">
@@ -72,6 +81,7 @@
 
   <script src="/js/rules.js?v=37"></script>
   <script src="/js/ai.js?v=37"></script>
+  <script src="/js/notation.js?v=45"></script>
   <script src="/js/game.js?v=37"></script>
   <script src="/js/ui.js?v=37"></script>
   <script src="/js/timer.js?v=37"></script>
