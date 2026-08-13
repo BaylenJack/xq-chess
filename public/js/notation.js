@@ -70,15 +70,16 @@
   function toRecord(history) {
     const map = R.initMap();
     const out = [];
-    for (let i = 0; i < (history || []).length; i++) {
-      const rec = history[i];
+    const list = history || [];
+    for (let i = 0; i < list.length; i++) {
+      const rec = list[i];
       out.push({ seq: i + 1, red: R.isRed(rec.mv.piece), text: describe(map, rec.mv) });
       R.makeMove(map, rec.mv);   // 记法不需要 captured
     }
     return out;
   }
 
-  const notation = { toRecord, _describe: describe };
+  const notation = { toRecord };
   root.XQ.notation = notation;
   if (typeof module !== 'undefined' && module.exports) module.exports = { notation };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

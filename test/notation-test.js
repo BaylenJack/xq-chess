@@ -45,14 +45,17 @@ console.log('== 记法: 基础 ==');
 console.log('== 记法: 消歧 ==');
 {
   // 两炮同列 (2,7) 与 (5,7): (5,7) 是前炮 (红 forward=row 增大)
-  const map0 = [mv(2, 1, 5, 7, 'C0')];            // 把 C0 挪到 (5,7), 与 C1(2,7) 同列制造双炮
-  eq(texts([...map0, mv(2, 7, 2, 4, 'C1')])[1], '後炮平五', '同列双炮: 後炮平五');
-  eq(texts([...map0, mv(5, 7, 5, 4, 'C0')])[1], '前炮平五', '同列双炮: 前炮平五');
+  const setup = [mv(2, 1, 5, 7, 'C0')];            // 把 C0 挪到 (5,7), 与 C1(2,7) 同列制造双炮
+  eq(texts([...setup, mv(2, 7, 2, 4, 'C1')])[1], '後炮平五', '同列双炮: 後炮平五');
+  eq(texts([...setup, mv(5, 7, 5, 4, 'C0')])[1], '前炮平五', '同列双炮: 前炮平五');
   // 叠兵: 两红兵同列 c=4, (4,4) 与 (5,4); 前兵 = (5,4)
   // (P1 一步跳到 (5,4) 仅为摆位, 记法重放按 history 逐步行棋不校验合法性)
   const pawns = [mv(3, 4, 4, 4, 'P2'), mv(3, 2, 5, 4, 'P1')];
   eq(texts([...pawns, mv(5, 4, 6, 4, 'P1')])[2], '前兵进一', '叠兵: 前兵进一');
   eq(texts([...pawns, mv(4, 4, 4, 3, 'P2')])[2], '後兵平六', '叠兵: 後兵平六');
+  // 三叠兵: 三红兵同列 c=4, (4,4)(5,4)(6,4); 前/中/後 = row 6/5/4; 中兵 = P1@(5,4)
+  const pawns3 = [...pawns, mv(3, 6, 6, 4, 'P3')];
+  eq(texts([...pawns3, mv(5, 4, 5, 3, 'P1')])[3], '中兵平六', '三叠兵: 中兵平六');
 }
 
 console.log('== 记法: 序列结构 ==');
@@ -63,6 +66,12 @@ console.log('== 记法: 序列结构 ==');
   eq(recs[0].red, true, '红方标记');
   eq(recs[1].red, false, '黑方标记');
   eq(notation.toRecord([]), [], '空 history 空数组');
+  eq(notation.toRecord(null), [], 'null history 空数组');
+  // 纯度: toRecord 不得改写输入 history (server 端 history 是共享数据)
+  const hist = [mv(2, 7, 2, 4, 'C1'), mv(9, 7, 7, 6, 'h1')];
+  const snapshot = JSON.stringify(hist);
+  notation.toRecord(hist);
+  assert(JSON.stringify(hist) === snapshot, '纯度: toRecord 不改写输入 history');
 }
 
 console.log(`\n记法测试: ${passed} 通过, ${failed} 失败`);

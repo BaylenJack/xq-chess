@@ -5,6 +5,6 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "test": "node test/test.js && node test/ai-test.js"
+    "test": "node test/test.js && node test/ai-test.js && node test/notation-test.js"
   }
 }
