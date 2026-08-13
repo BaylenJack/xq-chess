@@ -1348,7 +1348,7 @@ button, input, [role="button"], select, textarea {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 16px;
+  margin-top: 6px;
 }
 
 /* 倒计时 (单计时器: 按钮 + 数字) */
@@ -1411,48 +1411,6 @@ button, input, [role="button"], select, textarea {
   color: var(--ink-3);
   letter-spacing: 1px;
 }
-@keyframes clock-danger {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.06); }
-}
-}
-.timer-btn:active { transform: translateY(0); }
-
-/* 思考按钮: 小圆钮, 单击普通 / 长按升读 */
-.think-row {
-  display: flex;
-  justify-content: center;
-  margin-bottom: var(--sp-4);   /* 给下方 label 留空间 */
-  padding-top: var(--sp-2);
-}
-/* 特异性高于 .ctrl-btn (think-btn 同时带 ctrl-btn class) */
-.think-row .think-btn {
-  flex: 0 0 auto;
-  width: 52px;
-  min-width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  letter-spacing: 0;
-  font-weight: 600;
-  position: relative;
-  min-height: 52px;
-}
-.think-row .think-btn svg { width: 22px; height: 22px; opacity: .9; }
-.think-row .think-btn .think-label {
-  position: absolute;
-  bottom: -20px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.625rem;
-  letter-spacing: 1px;
-  white-space: nowrap;
-  color: var(--ink-3);
-}
-
 /* 控制行: 倒计时 + 悔棋 + 重新开始 三按钮紧凑 */
 .control-row {
   display: flex;
@@ -1515,19 +1473,19 @@ button, input, [role="button"], select, textarea {
 .ctrl-btn:disabled { opacity: .35; cursor: default; transform: none; }
 
 /* 思考按钮: 三态 (普通/深度/思考中) */
-/* 思考按钮状态 (特异性: think-row 内) */
-.think-row .think-btn svg { transition: transform var(--dur-base); }
-.think-row .think-btn.deep { border-color: var(--gold-3); color: var(--gold-4); background: linear-gradient(180deg, rgba(232, 182, 76, .18), rgba(168, 123, 40, .12)); }
-.think-row .think-btn.deep svg { transform: scale(1.08); }
-.think-row .think-btn.thinking { color: var(--gold-3); border-color: var(--gold-3); pointer-events: none; }
-.think-row .think-btn.thinking svg { animation: think-pulse 1.2s ease-in-out infinite; }
-/* iOS 长按确认闪光 (模拟触觉反馈) */
-.think-row .think-btn.deep-flash {
-  animation: deep-flash 250ms ease-out;
+/* 思考按钮 (行内, 与其他控制按钮同排) */
+.think-btn { gap: 6px; }
+.think-btn svg { width: 16px; height: 16px; }
+.think-btn .think-label { font-size: inherit; letter-spacing: inherit; color: inherit; position: static; transform: none; }
+.think-btn.thinking {
+  color: var(--gold-3);
+  border-color: var(--gold-3);
+  animation: think-glow 1.6s ease-in-out infinite;
 }
-@keyframes deep-flash {
-  0% { box-shadow: 0 0 0 0 rgba(232, 182, 76, .7); }
-  100% { box-shadow: 0 0 0 14px rgba(232, 182, 76, 0); }
+.think-btn.thinking svg { animation: think-pulse 1.2s ease-in-out infinite; }
+@keyframes think-glow {
+  0%, 100% { box-shadow: 0 0 6px rgba(232, 182, 76, .25), inset 0 1px 0 rgba(255, 220, 160, .08); }
+  50% { box-shadow: 0 0 16px rgba(232, 182, 76, .5), inset 0 1px 0 rgba(255, 220, 160, .08); }
 }
 @keyframes think-pulse {
   0%, 100% { opacity: .55; }

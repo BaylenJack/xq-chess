@@ -667,7 +667,7 @@
       if (XQ.thinking) return;
       XQ.thinking = true;
       btn.classList.add('thinking');
-      setLabel('深度思考中');
+      setLabel('思考中');
       const onTurn = () => {
         if (!XQ.thinking) return;
         if (st.status !== G.STATUS.PLAYING || st.turn !== playerSide) return;
@@ -774,8 +774,8 @@
       detectLowEnd();
       // 无 AI 提示引擎 (普通链接未注入 hint.js) → 隐藏思考按钮
       if (typeof XQ.ai === 'undefined' || typeof XQ.ai.startHint !== 'function') {
-        const thinkRow = document.querySelector('.think-row');
-        if (thinkRow) thinkRow.classList.add('hidden');
+        const thinkBtn = document.getElementById('thinkBtn');
+        if (thinkBtn) thinkBtn.classList.add('hidden');
       }
       buildBoard();
       bindControls();
