@@ -428,6 +428,7 @@
       showModal('对局开始');
       playSound('join');
       // 倒计时随 state 广播同步 (start 事件无 clock, 由紧随的 state 处理)
+      if (confirmState) resolveConfirm(null);   // 重开后所有确认模态均已过期
       endedShown = false;
       $('resultModal').classList.remove('show');
       render();
@@ -449,9 +450,10 @@
     es.addEventListener('undo_rejected', ev => {
       closeConfirmByKind('undo-wait');
       closeConfirmByKind('undo-ask');
-      let timeout = false;
-      try { timeout = !!(JSON.parse(ev.data) || {}).timeout; } catch (e) {}
-      showModal(timeout ? '悔棋请求超时' : '对方拒绝了你的悔棋请求');
+      let s = {};
+      try { s = JSON.parse(ev.data) || {}; } catch (e) {}
+      if (s.by === mySid) return;   // 自己刚拒绝的不再提示 (广播是房间级的)
+      showModal(s.timeout ? '悔棋请求超时' : '对方拒绝了你的悔棋请求');
     });
     es.addEventListener('error', () => {
       // EventSource 断线: 显示断线状态 (会自动重连, 重连后 server 推送最新 state)
@@ -685,7 +687,8 @@
       const ringWrap = $('confirmRing');
       const ringFg = $('ringFg');
       ringFg.style.strokeDasharray = String(RING_C);
-      let ringTimer = null;
+      // 先赋值再启动倒计时: tick 立即超时 (timeoutSec<=0) 调 resolveConfirm 也有路可退
+      confirmState = { resolve, kind: opts.kind || '', ringTimer: null };
       if (opts.timeoutSec) {
         ringWrap.classList.remove('hidden');
         const end = Date.now() + opts.timeoutSec * 1000;
@@ -696,12 +699,12 @@
           ringFg.style.strokeDashoffset = String(RING_C * (1 - left / (opts.timeoutSec * 1000)));
         };
         tick();
-        ringTimer = setInterval(tick, 250);
+        // tick 中已超时结掉则 confirmState 已清空, 不再起定时器
+        if (confirmState) confirmState.ringTimer = setInterval(tick, 250);
       } else {
         ringWrap.classList.add('hidden');
       }
-      confirmState = { resolve, kind: opts.kind || '', ringTimer };
-      $('confirmModal').classList.add('show');
+      if (confirmState) $('confirmModal').classList.add('show');
     });
   }
 

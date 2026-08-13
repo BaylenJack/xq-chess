@@ -1545,6 +1545,8 @@ button, input, [role="button"], select, textarea {
   transition: opacity var(--dur-base) var(--ease-out);
 }
 .modal.show { opacity: 1; pointer-events: auto; }
+/* toast 常驻最上层: 避免被 confirm/result 模态 (同 z-index, DOM 序靠后) 遮挡 (3.2s 自消不挡操作) */
+#modal { z-index: 110; }
 .modal-card {
   position: relative;
   padding: var(--sp-5) calc(var(--sp-7) + 8px);
