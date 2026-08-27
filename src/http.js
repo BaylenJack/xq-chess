@@ -1,0 +1,9 @@
+'use strict';
+const path=require('node:path');
+const MIME={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.ico':'image/x-icon'};
+function json(res,status,payload,headers={}){res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store',...headers});res.end(JSON.stringify(payload));}
+function text(res,status,payload,headers={}){res.writeHead(status,{'content-type':'text/plain; charset=utf-8',...headers});res.end(payload);}
+async function body(req,limit=32768){return new Promise((resolve,reject)=>{let raw='';req.setEncoding('utf8');req.on('data',chunk=>{raw+=chunk;if(raw.length>limit){const error=new Error('请求内容过大');error.status=413;reject(error);req.destroy();}});req.on('end',()=>{if(!raw)return resolve({});try{resolve(JSON.parse(raw));}catch(_){const error=new Error('JSON 格式错误');error.status=400;reject(error);}});req.on('error',reject);});}
+function safePublicPath(publicDir,pathname){let decoded;try{decoded=decodeURIComponent(pathname);}catch(_){return null;}const relative=decoded.replace(/^\/+/, '')||'index.html';if(relative.includes('\0'))return null;const full=path.resolve(publicDir,relative),base=path.resolve(publicDir)+path.sep;return full.startsWith(base)?{full,relative:relative.replace(/\\/g,'/')} : null;}
+function securityHeaders(){return {'x-content-type-options':'nosniff','referrer-policy':'same-origin','x-frame-options':'DENY','permissions-policy':'camera=(), microphone=(), geolocation=()','content-security-policy':"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"};}
+module.exports={MIME,json,text,body,safePublicPath,securityHeaders};

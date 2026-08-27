@@ -1,141 +1,120 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>对弈 · 中国象棋</title>
-  <link rel="stylesheet" href="/css/style.css?v=45">
+  <meta name="theme-color" content="#0b2528">
+  <title>棋局 · 青黛棋院</title>
+  <link rel="stylesheet" href="/css/app.css?v=4">
 </head>
-<body class="game-body">
+<body class="game-page">
+  <div class="atmosphere" aria-hidden="true"><span class="grain"></span><span class="orbit orbit-a"></span></div>
 
-  <div class="bg-aurora" aria-hidden="true">
-    <span class="blob a"></span>
-    <span class="blob b"></span>
-  </div>
-
-  <header class="game-top">
-    <div class="player-card" data-side="1">
-      <div class="player-frame">
-        <div class="avatar red"><span class="avatar-mark">帥</span><span class="online-dot" data-for="p1"></span></div>
-        <div class="player-meta">
-          <span class="role">执红</span>
-          <span class="name" id="p1-name">红方</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="vs-block"><span class="vs-char">VS</span></div>
-
-    <div class="player-card" data-side="-1">
-      <div class="player-frame">
-        <div class="avatar black"><span class="avatar-mark">將</span><span class="online-dot" data-for="p2"></span></div>
-        <div class="player-meta">
-          <span class="role">执黑</span>
-          <span class="name" id="p2-name">黑方</span>
-        </div>
-      </div>
-    </div>
+  <header class="game-header">
+    <a class="wordmark compact" href="/" aria-label="返回棋院大厅">
+      <span class="wordmark-seal">弈</span>
+      <span><strong>青黛棋院</strong><small>返回大厅</small></span>
+    </a>
+    <button id="roomBadge" class="room-chip" type="button" title="复制邀请链接">
+      <span>房间</span><b id="roomName">载入中</b>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>
+    </button>
   </header>
 
-  <div class="room-bar">
-    <button id="roomBadge" class="room-badge" title="复制邀请链接" aria-label="复制邀请链接">
-      <span class="room-label">房</span>
-      <span id="roomName" class="room-name">…</span>
-      <svg class="copy-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="9" y="9" width="11" height="11" rx="2"/>
-        <path d="M5 15V5a2 2 0 0 1 2-2h10"/>
-      </svg>
-    </button>
-  </div>
+  <main class="game-shell">
+    <section class="arena" aria-label="对局棋盘">
+      <header class="player-strip">
+        <article class="player-card red-side" data-side="1">
+          <span class="piece-avatar red"><b>帥</b><i class="online-dot" data-for="p1"></i></span>
+          <span class="player-meta"><small>红方 · 先行</small><strong class="name" id="p1-name">等待入席</strong></span>
+          <span class="turn-mark">行棋</span>
+        </article>
+        <div class="versus" aria-hidden="true"><span>对</span></div>
+        <article class="player-card black-side" data-side="-1">
+          <span class="player-meta align-right"><small>黑方 · 后行</small><strong class="name" id="p2-name">等待入席</strong></span>
+          <span class="piece-avatar black"><b>將</b><i class="online-dot" data-for="p2"></i></span>
+          <span class="turn-mark">行棋</span>
+        </article>
+      </header>
 
-  <section class="board-stage">
-    <div class="board-corner tl" aria-hidden="true"></div>
-    <div class="board-corner tr" aria-hidden="true"></div>
-    <div class="board-corner bl" aria-hidden="true"></div>
-    <div class="board-corner br" aria-hidden="true"></div>
+      <section class="board-frame">
+        <div class="frame-caption top" aria-hidden="true"><span>九路十行</span><i></i><span>楚汉争锋</span></div>
+        <div id="board" class="board" aria-label="中国象棋棋盘"></div>
+        <div id="waitOverlay" class="wait-overlay hidden">
+          <div class="wait-seal">候</div>
+          <h2>虚位以待</h2>
+          <p id="waitRoom">等待另一位棋友</p>
+          <button id="waitCopyBtn" class="primary-button" type="button">复制邀请链接</button>
+          <small>朋友打开链接后会自动填好房间名</small>
+        </div>
+      </section>
+    </section>
 
-    <div id="board" class="board-wrap" aria-label="棋盘"></div>
+    <aside class="match-desk" aria-label="棋局信息与操作">
+      <section class="turn-panel">
+        <p class="desk-label">CURRENT TURN</p>
+        <div id="status" class="turn-status" role="status" aria-live="polite">正在进入房间</div>
+        <div id="timerDisplay" class="clock-display hidden" aria-label="本回合剩余时间">
+          <span id="clock-main">60</span><small>秒</small>
+        </div>
+      </section>
 
-    <div id="waitOverlay" class="wait-overlay hidden">
-      <div class="wait-card">
-        <div class="wait-title">虚位以待</div>
-        <div class="wait-room" id="waitRoom"></div>
-        <button id="waitCopyBtn" class="wait-copy">复制邀请链接</button>
-        <div class="wait-sub">朋友进入同一房间即可开局</div>
-      </div>
-    </div>
+      <section id="recordPanel" class="record-panel">
+        <button id="recordHead" class="record-head" type="button" aria-expanded="true" aria-controls="recordBody">
+          <span><small>MOVE RECORD</small><b>棋谱</b></span>
+          <span id="recordLast" class="record-last">暂无着法</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>
+        </button>
+        <div id="recordBody" class="record-body"><p class="record-empty">落下第一子后，棋谱会记录在这里。</p></div>
+      </section>
 
-    <div id="status" class="status-pill">进入房间中…</div>
-  </section>
+      <section class="control-panel">
+        <p class="desk-label">MATCH TOOLS</p>
+        <div class="control-grid">
+          <button id="timerBtn" class="tool-button" type="button" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></svg><span>步时</span>
+          </button>
+          <button id="thinkBtn" class="tool-button hidden" type="button" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 20h6M10 17h4M8 14c-1.3-1-2-2.6-2-4.3a6 6 0 1 1 12 0c0 1.7-.7 3.3-2 4.3-.8.7-1 1.2-1 2H9c0-.8-.2-1.3-1-2Z"/></svg><span class="think-label">AI 提示</span>
+          </button>
+          <button id="undoBtn" class="tool-button" type="button" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7H5v-4M5 7a8 8 0 1 1-1 8"/></svg><span>悔棋</span>
+          </button>
+          <button id="restartBtn" class="tool-button" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5M4 18v-5h5M6.1 9a7 7 0 0 1 11.8-2.6L20 9M4 15l2.1 2.6A7 7 0 0 0 17.9 15"/></svg><span>重开</span>
+          </button>
+        </div>
+      </section>
 
-  <section id="recordPanel" class="record-panel">
-    <button id="recordHead" class="record-head" aria-expanded="false" aria-controls="recordBody" aria-label="展开/收起棋谱">
-      <span class="record-title">棋谱</span>
-      <span id="recordLast" class="record-last">暂无着法</span>
-      <span class="record-arrow" aria-hidden="true">▾</span>
-    </button>
-    <div id="recordBody" class="record-body"></div>
-  </section>
+      <p class="desk-foot">棋局由服务器裁定 · 断线后席位保留 60 秒</p>
+    </aside>
+  </main>
 
-  <footer class="game-controls">
-    <div class="control-row">
-      <button id="timerBtn" class="timer-btn" aria-label="切换倒计时">⏱</button>
-      <div id="timerDisplay" class="timer-inline hidden">
-        <span class="timer-num" id="clock-main">60</span><span class="timer-unit">s</span>
-      </div>
-      <button id="thinkBtn" class="ctrl-btn think-btn" aria-label="切换思考模式" aria-pressed="false">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M9 21h6"/><path d="M12 17v4"/><path d="M5 8a7 7 0 0 1 14 0c0 3-3 4-3 8H8c0-4-3-5-3-8z"/>
-        </svg>
-        <span class="think-label">深度思考</span>
-      </button>
-      <button id="undoBtn" class="ctrl-btn">悔棋</button>
-      <button id="restartBtn" class="ctrl-btn">重新开始</button>
-    </div>
-  </footer>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-  <div id="modal" class="modal"><div class="modal-card"></div></div>
-
-  <!-- 通用确认模态 (替代原生 confirm) -->
-  <div id="confirmModal" class="modal" role="dialog" aria-modal="true">
-    <div class="modal-card confirm-card">
-      <div class="confirm-title" id="confirmTitle"></div>
-      <div class="confirm-sub hidden" id="confirmSub"></div>
-      <div class="confirm-ring hidden" id="confirmRing">
-        <svg viewBox="0 0 40 40" aria-hidden="true">
-          <circle class="ring-bg" cx="20" cy="20" r="17"/>
-          <circle class="ring-fg" id="ringFg" cx="20" cy="20" r="17"/>
-        </svg>
-        <span class="ring-num" id="ringNum">30</span>
-      </div>
-      <div class="confirm-actions" id="confirmActions">
-        <button id="confirmCancel" class="ctrl-btn">取消</button>
-        <button id="confirmOk" class="ctrl-btn primary">确定</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 胜负结算面板 -->
-  <div id="resultModal" class="modal" role="dialog" aria-modal="true">
-    <div class="modal-card result-card">
-      <div class="result-kicker" id="resultReason"></div>
-      <div class="result-title" id="resultTitle"></div>
-      <div class="result-sub" id="resultSub"></div>
-      <div class="result-actions">
-        <button id="resultRestart" class="ctrl-btn primary">再来一局</button>
-        <button id="resultHome" class="ctrl-btn">回大厅</button>
-      </div>
+  <div id="confirmModal" class="dialog-layer" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" hidden>
+    <div class="dialog-card">
+      <span class="dialog-seal">问</span>
+      <h2 id="confirmTitle"></h2>
+      <p id="confirmSub"></p>
+      <div id="confirmRing" class="confirm-ring hidden"><span id="ringNum">30</span><svg viewBox="0 0 44 44"><circle class="ring-track" cx="22" cy="22" r="18"/><circle id="ringFg" class="ring-value" cx="22" cy="22" r="18"/></svg></div>
+      <div id="confirmActions" class="dialog-actions"><button id="confirmCancel" type="button">取消</button><button id="confirmOk" class="primary" type="button">确定</button></div>
     </div>
   </div>
 
-  <script src="/js/rules.js?v=45"></script>
-  <script src="/js/ai.js?v=45"></script>
-  <script src="/js/notation.js?v=45"></script>
-  <script src="/js/game.js?v=45"></script>
-  <script src="/js/ui.js?v=45"></script>
-  <script src="/js/timer.js?v=45"></script>
-  <script>
-    window.addEventListener('DOMContentLoaded', () => XQ.ui.init());
-  </script>
+  <div id="resultModal" class="dialog-layer" role="dialog" aria-modal="true" aria-labelledby="resultTitle" hidden>
+    <div class="dialog-card result-card">
+      <span class="dialog-seal">局</span>
+      <p id="resultReason" class="result-reason"></p>
+      <h2 id="resultTitle"></h2>
+      <p id="resultSub"></p>
+      <div class="dialog-actions"><button id="resultHome" type="button">返回大厅</button><button id="resultRestart" class="primary" type="button">再来一局</button></div>
+    </div>
+  </div>
+
+  <script src="/js/rules.js?v=3"></script>
+  <script src="/js/notation.js?v=2"></script>
+  <script src="/js/clock.js?v=2"></script>
+  <script src="/js/game-page.js?v=3"></script>
 </body>
 </html>

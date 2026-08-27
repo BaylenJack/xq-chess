@@ -1,141 +1,79 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>对弈 · 中国象棋</title>
-  <link rel="stylesheet" href="/css/style.css?v=45">
+  <meta name="theme-color" content="#0b2528">
+  <meta name="description" content="青黛棋院：打开同一房间，与朋友实时下一局中国象棋。">
+  <title>青黛棋院 · 中国象棋</title>
+  <link rel="stylesheet" href="/css/app.css?v=4">
 </head>
-<body class="lobby-body">
-
-  <!-- 远景光斑 -->
-  <div class="bg-aurora">
-    <span class="blob a"></span>
-    <span class="blob b"></span>
-    <span class="blob c"></span>
+<body class="lobby-page">
+  <div class="atmosphere" aria-hidden="true">
+    <span class="grain"></span>
+    <span class="orbit orbit-a"></span>
+    <span class="orbit orbit-b"></span>
   </div>
 
-  <!-- 顶部品牌 -->
-  <header class="brand">
-    <div class="brand-mark" aria-hidden="true">
-      <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="m" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="#f4d27a"/>
-            <stop offset="100%" stop-color="#a87b28"/>
-          </linearGradient>
-        </defs>
-        <circle cx="32" cy="32" r="30" fill="url(#m)" stroke="#3d2611" stroke-width="2"/>
-        <text x="32" y="44" text-anchor="middle" font-family="KaiTi,STKaiti,serif" font-size="38" font-weight="bold" fill="#8b0000">帥</text>
-      </svg>
-    </div>
-    <div class="brand-text">
-      <h1>对弈</h1>
-      <p>中国象棋 · 棋友对局</p>
-    </div>
+  <header class="site-header">
+    <a class="wordmark" href="/" aria-label="青黛棋院首页">
+      <span class="wordmark-seal">弈</span>
+      <span><strong>青黛棋院</strong><small>QINGDAI XIANGQI</small></span>
+    </a>
+    <span id="engineStatus" class="live-note"><i></i>双人实时对弈</span>
   </header>
 
-  <!-- 中央卡片 -->
-  <main class="lobby-card-wrap">
-    <div class="lobby-card">
-      <div class="card-corner tl" aria-hidden="true"></div>
-      <div class="card-corner tr" aria-hidden="true"></div>
-      <div class="card-corner bl" aria-hidden="true"></div>
-      <div class="card-corner br" aria-hidden="true"></div>
+  <main class="lobby-shell">
+    <section class="lobby-hero" aria-labelledby="heroTitle">
+      <p class="eyebrow">一方棋盘 · 两位故友</p>
+      <h1 id="heroTitle">隔屏相逢，<br><em>执子见高下。</em></h1>
+      <p class="hero-copy">不注册，不排队。约好一个房间名，红方先行，棋局便从第一声落子开始。</p>
 
-      <div class="card-header">
-        <span class="kicker">开启对局</span>
-        <h2>与友手谈</h2>
-        <p class="sub">输入<strong>相同的房间名</strong>,即可隔空对弈。先入者执红,后入者执黑。</p>
+      <div class="river-axis" aria-hidden="true">
+        <span>楚河</span><b></b><span>汉界</span>
       </div>
 
-      <div class="card-body">
-        <label class="field">
-          <input id="nickname" type="text" maxlength="12" autocomplete="off" placeholder=" ">
-          <span class="field-label">你的昵称</span>
-          <span class="field-line"></span>
+      <dl class="feature-list">
+        <div><dt>01</dt><dd><strong>同名入室</strong><span>输入相同房间名</span></dd></div>
+        <div><dt>02</dt><dd><strong>实时同步</strong><span>走子、棋谱与计时一致</span></dd></div>
+        <div><dt>03</dt><dd><strong>断线续局</strong><span>短暂离开仍保留席位</span></dd></div>
+      </dl>
+    </section>
+
+    <section class="join-panel" aria-labelledby="joinTitle">
+      <div class="panel-index">入局帖</div>
+      <div class="panel-heading">
+        <p>INVITATION</p>
+        <h2 id="joinTitle">落座开局</h2>
+        <span>先入者执红，后入者执黑</span>
+      </div>
+
+      <form id="joinForm" novalidate>
+        <label class="input-group" for="nickname">
+          <span class="input-order">壹</span>
+          <span class="input-copy"><b>你的称呼</b><small>对手将在棋盘上看到</small></span>
+          <input id="nickname" name="nickname" type="text" maxlength="12" autocomplete="nickname" placeholder="例如：王小帅">
         </label>
 
-        <label class="field">
-          <input id="roomname" type="text" maxlength="20" autocomplete="off" placeholder=" " autofocus>
-          <span class="field-label">房间名</span>
-          <span class="field-line"></span>
+        <label class="input-group" for="roomname">
+          <span class="input-order">贰</span>
+          <span class="input-copy"><b>房间名</b><small>与朋友输入完全相同的名字</small></span>
+          <input id="roomname" name="roomname" type="text" maxlength="24" autocomplete="off" placeholder="例如：今晚八点" required autofocus>
         </label>
 
-        <button id="joinBtn" class="cta">
-          <span class="cta-text">进入棋盘</span>
-          <span class="cta-arrow">→</span>
+        <p id="formError" class="form-error" role="alert" aria-live="polite"></p>
+        <button class="join-button" type="submit">
+          <span>进入棋局</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
         </button>
-      </div>
+      </form>
 
-      <div class="card-footer">
-        <span class="hint-dot"></span>
-        <small>小提示:昵称会显示给对手;房间名越独特越不容易撞房。</small>
-      </div>
-    </div>
-
-    <div class="hero-stamp" aria-hidden="true">
-      <svg viewBox="0 0 120 120">
-        <circle cx="60" cy="60" r="56" fill="none" stroke="#e8b64c" stroke-width="1" stroke-opacity=".4"/>
-        <circle cx="60" cy="60" r="44" fill="none" stroke="#e8b64c" stroke-width="0.5" stroke-opacity=".5"/>
-        <text x="60" y="68" text-anchor="middle" font-family="KaiTi,STKaiti,serif" font-size="22" fill="#e8b64c" fill-opacity=".65" letter-spacing="6">楚河漢界</text>
-      </svg>
-    </div>
+      <p class="privacy-note"><span>私</span> 房间名只用于本次配对，不建立账号。</p>
+    </section>
   </main>
 
-  <!-- 底部 -->
-  <footer class="footline">
-    <span>静夜思 · 一枰起</span>
-  </footer>
-
-  <div id="modal" class="modal"><div class="modal-card"></div></div>
-
-  <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      var joinBtn = document.getElementById('joinBtn');
-      var roomInput = document.getElementById('roomname');
-      var nameInput = document.getElementById('nickname');
-      // 恢复上次输入的昵称/房间 (返回时不丢)
-      try {
-        var savedName = localStorage.getItem('xq-last-name');
-        var savedRoom = localStorage.getItem('xq-last-room');
-        if (savedName && nameInput.value === '') nameInput.value = savedName;
-        if (savedRoom && roomInput.value === '') roomInput.value = savedRoom;
-      } catch (e) { /* localStorage 不可用忽略 */ }
-      // 邀请链接带房间名: 优先预填 (?room=)
-      try {
-        var urlRoom = new URLSearchParams(location.search).get('room');
-        if (urlRoom) roomInput.value = urlRoom.slice(0, 20);
-      } catch (e) { /* 忽略 */ }
-      var showError = function (text) {
-        var m = document.getElementById('modal');
-        m.querySelector('.modal-card').textContent = text;
-        m.classList.add('show');
-        setTimeout(function () { m.classList.remove('show'); }, 1800);
-      };
-      var go = function () {
-        var room = roomInput.value.trim();
-        var name = nameInput.value.trim() || '棋友';
-        if (!room) {
-          roomInput.parentElement.classList.add('shake');
-          setTimeout(function () { roomInput.parentElement.classList.remove('shake'); }, 500);
-          showError('请填写房间名');
-          return;
-        }
-        // 记住昵称/房间 (下次进入自动填充)
-        try {
-          localStorage.setItem('xq-last-name', name);
-          localStorage.setItem('xq-last-room', room);
-        } catch (e) { /* 忽略 */ }
-        var hint = new URLSearchParams(location.search).get('hint');
-        var q = new URLSearchParams({ room: room, name: name });
-        if (hint) q.set('hint', hint);
-        location.href = '/game.html?' + q.toString();
-      };
-      joinBtn.addEventListener('click', go);
-      roomInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
-      nameInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
-    });
-  </script>
+  <footer class="site-footer"><span>楚河为界</span><i></i><span>落子有声</span></footer>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/js/lobby.js?v=3" defer></script>
 </body>
 </html>

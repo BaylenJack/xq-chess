@@ -1,73 +1,33 @@
-/*!
- * xq-chess AI 提示引擎 (特权脚本, 仅授权用户)
- * 由服务器验证 ?hint=KEY 通过后注入本文件, 不含密钥。
- * API: XQ.ai.startHint('medium'|'hard', playerSide) / XQ.ai.stopHint()
- * 中级: 限时迭代加深 6s 预算; 高手: 15s 预算
- * 依赖: XQ.rules, XQ.game, XQ.ui
- */
-(function () {
+/* 专属提示控制器：8 秒预算、搜索进度、局面变化即时取消。 */
+(function(root){
   'use strict';
-
-  const SLOT_ID = 'hintSlot';
-  const slot = document.getElementById(SLOT_ID);
-  // 无 hintSlot (新版 UI 已移走开关): 不创建开关, 仅提供 API
-  let active = null;   // { level, side, intervalId, computing }
-
-  let worker = null;
-  let workerSeq = 0;
-  function ensureWorker() {
-    if (worker) return;
-    try {
-      worker = new Worker('/js/ai-worker.js?v=21');
-      worker.onmessage = (ev) => {
-        const { id, mv, err } = ev.data || {};
-        if (id !== workerSeq) return;
-        if (active) active.computing = false;
-        if (err) { XQ.ui.showHint(null); return; }
-        XQ.ui.showHint(mv);
+  let worker=null,active=false,poll=0,seq=0,busy=false,getState=null,getSide=null,onMove=null,onProgress=null,lastKey='',jobKey='';
+  function destroyWorker(){if(worker){worker.terminate();worker=null;}busy=false;jobKey='';seq++;}
+  function ensureWorker(){
+    if(worker)return true;
+    try{
+      worker=new Worker('/js/ai-worker.js?v=3');
+      worker.onmessage=event=>{
+        const data=event.data||{};if(data.id!==seq)return;
+        if(data.type==='progress'){onProgress?.({...data.progress,state:'searching'});return;}
+        busy=false;
+        if(data.type==='error'){onProgress?.({state:'error'});onMove?.(null);return;}
+        if(active){lastKey=jobKey;onMove?.(data.move||null);onProgress?.({state:'ready',...(data.move?.stats||{})});}
       };
-      worker.onerror = () => { if (active) active.computing = false; XQ.ui.showHint(null); };
-    } catch (e) { worker = null; }
+      worker.onerror=()=>{busy=false;onProgress?.({state:'error'});onMove?.(null);};return true;
+    }catch(_){return false;}
   }
-
-  function tryStart() {
-    if (!active) return;
-    const ui = XQ.ui, st = ui.state;
-    if (st.status !== XQ.game.STATUS.PLAYING) return;
-    const side = ui.playerSide;
-    if (side == null) return;
-    if (st.turn !== side) return;  // 轮到自己才计算
-    if (active.computing) return;
-    if (!worker) {
-      // Worker 不可用: 绝不主线程同步计算 (会冻结 UI 15 秒), 直接放弃
-      window.XQ.ai.stopHint();
-      XQ.ui.showHint(null);
-      return;
-    }
-    active.computing = true;
-    workerSeq++;
-    worker.postMessage({
-      id: workerSeq,
-      map: st.map,
-      my: side,
-      depth: 10,          // 只保留深度思考
-      randomize: false,
-    });
+  function positionKey(state,side){return `${state.history?.length||0}:${state.turn}:${side}:${state.lastMove?.mv?.fr?.r??'-'}:${state.lastMove?.mv?.to?.r??'-'}`;}
+  function tick(){
+    if(!active)return;const state=getState?.(),side=getSide?.();
+    if(!state||state.status!=='playing'||state.turn!==side){onProgress?.({state:'standby'});return;}
+    const key=positionKey(state,side);
+    if(busy&&key!==jobKey){destroyWorker();onMove?.(null);}
+    if(busy||key===lastKey)return;
+    if(!ensureWorker()){stop();onProgress?.({state:'error'});return;}
+    busy=true;jobKey=key;seq++;onProgress?.({state:'starting',depth:0,elapsedMs:0});worker.postMessage({id:seq,board:state.board,side});
   }
-
-  window.XQ.ai = window.XQ.ai || {};
-  window.XQ.ai.startHint = function (level, side) {
-    if (active) return;  // 已在运行
-    active = { level, side, computing: false };
-    ensureWorker();
-    tryStart();
-    // 轮到自己再算: 每 350ms 检查
-    active.intervalId = setInterval(tryStart, 350);
-  };
-  window.XQ.ai.stopHint = function () {
-    if (!active) return;
-    clearInterval(active.intervalId);
-    active = null;
-    XQ.ui.showHint(null);
-  };
-})();
+  function start(stateGetter,sideGetter,moveCallback,progressCallback){active=true;getState=stateGetter;getSide=sideGetter;onMove=moveCallback;onProgress=progressCallback;lastKey='';clearInterval(poll);tick();poll=setInterval(tick,180);}
+  function stop(){active=false;clearInterval(poll);poll=0;lastKey='';destroyWorker();onMove?.(null);onProgress?.({state:'off'});}
+  root.XQ=root.XQ||{};root.XQ.hint={start,stop,get active(){return active;},get busy(){return busy;}};
+})(globalThis);
