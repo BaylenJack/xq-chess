@@ -4,6 +4,7 @@
   let state={board:R.initialBoard(),turn:R.RED,status:'playing',check:false,history:[],lastMove:null,players:[],clock:{on:false,deadline:0}};
   let sid='',room='',playerSide=null,flipped=false,stream=null,cells=[],selected=null,legal=[],illegal=[],hintMove=null,pendingMove=false;
   let audio=null,toastTimer=0,confirmState=null,resultShown=false;
+  let aiMode='hint',autoPause=false,aiHintLabel=null,aiAutoLabel=null; // hint|auto|off
 
   function element(tag,className,text){const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node;}
   const viewRow=r=>flipped?9-r:r, logicRow=r=>flipped?9-r:r;
@@ -62,11 +63,45 @@
   async function copyInvite(){try{await navigator.clipboard.writeText(inviteUrl());showToast('邀请链接已复制');}catch(_){showToast('复制失败，请复制当前网址');}}
   function showToast(message){const node=$('toast');node.textContent=message;node.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>node.classList.remove('show'),2800);}
 
+  function onlineCount(){return state.players.filter(p=>p.online).length;}
+  function aiSeconds(info){return Math.min(7.8,(info.elapsedMs||0)/1000).toFixed(1);}
+  // 自动下棋与 AI 提示共用同一个引擎（XQ.hint），仅落子方式不同。
+  function onAiProgress(info){
+    if(aiMode==='auto'){if(!aiAutoLabel)return;
+      if(info.state==='searching')aiAutoLabel.textContent=`自动思考 ${aiSeconds(info)}s · 深${info.depth}`;
+      else if(info.state==='starting')aiAutoLabel.textContent='自动思考中';
+      else if(info.state==='ready')aiAutoLabel.textContent='AI 自动';
+      else if(info.state==='standby')aiAutoLabel.textContent=autoPause?'自动 · 等待对手':'自动 · 待机';
+      else if(info.state==='error')aiAutoLabel.textContent='AI 暂不可用';
+      return;}
+    if(!aiHintLabel)return;
+    if(info.state==='searching')aiHintLabel.textContent=`AI · ${aiSeconds(info)}s · 深${info.depth}`;
+    else if(info.state==='starting')aiHintLabel.textContent='AI · 起算';
+    else if(info.state==='ready')aiHintLabel.textContent=`AI 建议 · 深${info.depth||0}`;
+    else if(info.state==='standby')aiHintLabel.textContent='AI 提示 · 待机';
+    else if(info.state==='error')aiHintLabel.textContent='AI 暂不可用';
+    else aiHintLabel.textContent='AI 提示';
+  }
+  function onAiMove(mv){
+    if(aiMode!=='auto'){hintMove=mv||null;render();return;}
+    if(mv&&onlineCount()===2){sendMove(mv);return;}      // 双方在座 → 直接落子
+    if(mv){autoPause=true;stopAi();}                    // 对手离席 → 暂停，等其归来
+  }
+  function startAi(){autoPause=false;if(root.XQ.hint)root.XQ.hint.start(()=>state,()=>playerSide,onAiMove,onAiProgress);}
+  function stopAi(){if(root.XQ.hint)root.XQ.hint.stop();}
+  function refreshAi(){
+    const think=$('thinkBtn'),auto=$('autoBtn');aiHintLabel=aiHintLabel||think?.querySelector('.think-label');aiAutoLabel=aiAutoLabel||auto?.querySelector('.auto-label');
+    if(think){think.classList.toggle('active',aiMode==='hint');think.classList.toggle('thinking',aiMode==='hint');think.setAttribute('aria-pressed',String(aiMode==='hint'));}
+    if(auto){auto.classList.toggle('active',aiMode==='auto');auto.classList.toggle('thinking',aiMode==='auto');auto.setAttribute('aria-pressed',String(aiMode==='auto'));}
+  }
+  function setAiMode(mode){aiMode=mode;refreshAi();stopAi();if(mode!=='off')startAi();}
+
   function applyState(next){
     const previousLength=state.history.length,last=next.history?.at(-1);state=next;if(next.you?.side&&next.you.side!==playerSide){playerSide=next.you.side;flipped=playerSide===R.RED;for(const row of cells)for(const slot of row){slot.el.dataset.piece='__refresh__';}}
     clearSelection();render();
     if(next.history.length>previousLength&&last){sound(last.captured?'capture':'move');animateMove(last.mv);if(next.check)sound('check');}
     if(next.status!=='playing'&&!resultShown){resultShown=true;showResult(next);}else if(next.status==='playing')resultShown=false;
+    if(aiMode==='auto'&&autoPause&&state.status==='playing'&&state.turn===playerSide&&onlineCount()===2)startAi();
   }
   function animateMove(mv){const from=cells[viewRow(mv.fr.r)]?.[mv.fr.c],to=cells[viewRow(mv.to.r)]?.[mv.to.c];if(from){const dot=element('span','move-trail-dot');from.el.append(dot);setTimeout(()=>dot.remove(),700);}if(to){for(const cls of ['move-land-ring','move-ripple']){const ring=element('span',cls);to.el.append(ring);setTimeout(()=>ring.remove(),900);}to.el.querySelector('.piece')?.classList.add('landed');}}
   function connect(){stream?.close();stream=new EventSource(`/api/stream?room=${encodeURIComponent(room)}&sid=${encodeURIComponent(sid)}`);stream.addEventListener('state',event=>applyState(JSON.parse(event.data)));stream.addEventListener('start',()=>{showToast('双方入席，开局');sound('join');});stream.addEventListener('peer_left',()=>showToast('对手暂时离席，正在保留座位'));stream.addEventListener('undo_request',async event=>{const data=JSON.parse(event.data);if(data.self)return;const answer=await confirmDialog({kind:'undo-ask',title:'对方请求悔棋',sub:'同意后将退回对方上一手之前。',ok:'同意',cancel:'拒绝',seconds:30});if(answer===null)return;request(answer?'undo/accept':'undo/reject',{room,sid}).catch(e=>showToast(e.message));});stream.addEventListener('undo_rejected',event=>{closeConfirm('undo-wait');const data=JSON.parse(event.data);showToast(data.timeout?'悔棋请求已超时':'对方没有同意悔棋');});stream.onerror=()=>{$('status').textContent='连接中断 · 正在重连';};}
@@ -89,19 +124,12 @@
     $('resultHome').addEventListener('click',()=>location.href='/');$('resultRestart').addEventListener('click',()=>{ $('resultModal').hidden=true;request('restart',{room,sid}).catch(e=>showToast(e.message));});
     root.XQ.clock.onExpire(()=>request('timeout',{room,sid}).catch(()=>{}));
     if(root.XQ.hint){
-      const button=$('thinkBtn'),label=button.querySelector('.think-label');button.classList.remove('hidden');
-      const progress=info=>{
-        if(info.state==='searching')label.textContent=`AI · ${Math.min(7.8,(info.elapsedMs||0)/1000).toFixed(1)}s · 深${info.depth}`;
-        else if(info.state==='starting')label.textContent='AI · 起算';
-        else if(info.state==='ready')label.textContent=`AI 建议 · 深${info.depth||0}`;
-        else if(info.state==='standby')label.textContent='AI 提示 · 待机';
-        else if(info.state==='error')label.textContent='AI 暂不可用';
-        else label.textContent='AI 提示';
-      };
-      const enable=()=>{root.XQ.hint.start(()=>state,()=>playerSide,mv=>{hintMove=mv;render();},progress);button.classList.add('thinking');button.setAttribute('aria-pressed','true');};
-      const disable=()=>{root.XQ.hint.stop();button.classList.remove('thinking');button.setAttribute('aria-pressed','false');label.textContent='AI 提示';};
-      button.addEventListener('click',()=>{ensureAudio();if(root.XQ.hint.active)disable();else enable();});
-      enable();
+      const think=$('thinkBtn'),auto=$('autoBtn');
+      think.classList.remove('hidden');auto.classList.remove('hidden');
+      aiHintLabel=think.querySelector('.think-label');aiAutoLabel=auto.querySelector('.auto-label');
+      think.addEventListener('click',()=>{ensureAudio();setAiMode(aiMode==='hint'?'off':'hint');});
+      auto.addEventListener('click',()=>{ensureAudio();setAiMode(aiMode==='auto'?'off':'auto');});
+      setAiMode('hint');
     }
   }
   function init(){buildBoard();bind();render();join();}
