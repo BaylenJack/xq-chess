@@ -17,10 +17,10 @@
   --brass-light: #e3bb77;
   --cinnabar: #b74636;
   --cinnabar-dark: #7e281f;
-  --hint-electric: #ff2bd6;
+  --hint-electric: #f04bc9;
   --hint-core: #fff5ff;
-  --hint-aura: rgba(255, 43, 214, .72);
-  --hint-edge: rgba(28, 4, 35, .9);
+  --hint-aura: rgba(240, 75, 201, .42);
+  --hint-edge: rgba(28, 4, 35, .7);
   --line: rgba(198, 211, 196, .16);
   --line-strong: rgba(227, 187, 119, .36);
   --shadow: 0 24px 70px rgba(0, 0, 0, .36);
@@ -213,32 +213,35 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .legal-dot { width: calc(var(--cell)*.2); height: calc(var(--cell)*.2); border-radius: 50%; background: var(--cinnabar); box-shadow: 0 0 0 4px rgba(183,70,54,.14); pointer-events: none; }
 .cell.legal:has(.piece) .legal-dot { width: calc(var(--cell)*.72); height: calc(var(--cell)*.72); background: transparent; border: 3px solid var(--cinnabar); box-shadow: none; }
 .illegal-x { display: grid; place-items: center; width: calc(var(--cell)*.34); height: calc(var(--cell)*.34); border-radius: 50%; color: #f4d9d1; background: var(--cinnabar-dark); font: 700 calc(var(--cell)*.2)/1 var(--sans); pointer-events: none; }
-.cell.last-from::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--brass); box-shadow: 0 0 0 4px rgba(197,139,74,.17); }
+.cell.last-from::before {
+  content: "";
+  z-index: 4;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffd27d;
+  box-shadow: 0 0 0 2px rgba(51,30,12,.72), 0 0 12px 5px rgba(255,199,99,.58);
+}
 .cell.last-to::after, .cell.hint-from::after, .cell.hint-to::after, .cell.check::after { content: ""; position: absolute; inset: 5px; border-radius: 50%; border: 2px solid var(--brass); pointer-events: none; }
+.cell.last-to::after {
+  z-index: 4;
+  inset: 4px;
+  border: 3px solid #f5c66f;
+  box-shadow: 0 0 0 1px rgba(51,30,12,.65), 0 0 14px 5px rgba(245,198,111,.55), inset 0 0 8px rgba(255,224,164,.3);
+}
 .cell.hint-from::after, .cell.hint-to::after {
-  inset: 1px;
+  inset: 5px;
   z-index: 5;
-  border: 4px solid var(--hint-electric);
-  box-shadow:
-    0 0 0 2px var(--hint-edge),
-    inset 0 0 0 2px var(--hint-core),
-    0 0 18px 7px var(--hint-aura);
+  border: 3px solid var(--hint-electric);
+  box-shadow: 0 0 0 1px var(--hint-edge), 0 0 12px 3px var(--hint-aura);
 }
 .cell.hint-from::after {
   border-style: dashed;
-  background: radial-gradient(circle, transparent 58%, rgba(255,245,255,.2) 60% 72%, transparent 74%);
 }
 .cell.hint-to::after {
-  inset: -1px;
-  border-width: 5px;
-  border-color: var(--hint-core);
-  background: radial-gradient(circle, rgba(255,245,255,.92) 0 8%, rgba(255,43,214,.52) 10% 25%, transparent 28%);
-  box-shadow:
-    0 0 0 3px var(--hint-edge),
-    0 0 0 7px var(--hint-electric),
-    0 0 26px 11px var(--hint-aura),
-    inset 0 0 16px rgba(255,43,214,.78);
-  animation: hint-beacon .9s ease-in-out infinite;
+  inset: 4px;
+  border-style: solid;
+  animation: hint-beacon 1.2s ease-in-out infinite;
 }
 .cell.check::after { border-color: var(--cinnabar); box-shadow: 0 0 0 4px rgba(183,70,54,.22); animation: breathe .8s ease-in-out infinite; }
 .move-trail-dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: var(--brass-light); box-shadow: 0 0 16px var(--brass); animation: fade-out .65s forwards; }
@@ -305,7 +308,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 @keyframes nudge { 25%{transform:translateX(-4px)}75%{transform:translateX(4px)} }
 @keyframes breathe { 50% { transform: scale(1.08); opacity: .72; } }
 @keyframes hint-beacon {
-  50% { transform: scale(1.09); filter: brightness(1.18); box-shadow: 0 0 0 3px var(--hint-edge), 0 0 0 8px var(--hint-electric), 0 0 34px 15px rgba(255,43,214,.88), inset 0 0 20px rgba(255,43,214,.9); }
+  50% { transform: scale(1.04); filter: brightness(1.1); box-shadow: 0 0 0 1px var(--hint-edge), 0 0 16px 5px rgba(240,75,201,.56); }
 }
 @keyframes fade-out { to { opacity: 0; transform: scale(.25); } }
 @keyframes ripple { from { transform: scale(.72); opacity: 1; } to { transform: scale(1.45); opacity: 0; } }
